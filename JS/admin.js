@@ -99,6 +99,7 @@ function openUserDetail(index) {
   document.getElementById('modal-user-detail').classList.remove('hidden');
 }
 
+// Загрузка JSON-файлов
 document.getElementById('btn-load-user').addEventListener('click', () => {
   document.getElementById('admin-import-file').click();
 });
@@ -121,6 +122,30 @@ document.getElementById('admin-import-file').addEventListener('change', (e) => {
     reader.readAsText(file);
   }
   e.target.value = '';
+});
+
+// Новая кнопка: загрузить себя из localStorage
+document.getElementById('btn-load-self').addEventListener('click', () => {
+  const localData = localStorage.getItem('app_data');
+  if (!localData) {
+    alert('Нет данных в localStorage. Сначала откройте основное приложение.');
+    return;
+  }
+  try {
+    const data = JSON.parse(localData);
+    // Проверяем, не добавлен ли уже этот пользователь (по имени, можно добавить более точную проверку)
+    const exists = adminUsers.some(u => u.profile?.name === data.profile?.name && u.profile?.totalXP === data.profile?.totalXP);
+    if (exists) {
+      alert('Этот пользователь уже загружен.');
+      return;
+    }
+    adminUsers.push(data);
+    saveAdminUsers();
+    renderUsersList();
+    alert('Ваши данные загружены в админ-панель.');
+  } catch (err) {
+    alert('Ошибка чтения данных.');
+  }
 });
 
 document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => {
