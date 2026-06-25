@@ -546,6 +546,7 @@ function renderAll() {
 }
 
 // ========== ЗАПУСК ==========
+// В конце файла, после всех функций, инициализация:
 (async function init() {
     loadAppData();
     bindEvents();
@@ -557,23 +558,27 @@ function renderAll() {
         return;
     }
 
-    // Логика таймера:
-    // 1. Если профиль ещё не отправлялся (profileSent === false) – отправляем сейчас и ставим таймер.
-    // 2. Если профиль уже отправлялся, но таймер не установлен (lastSent === 0) – просто ставим таймер (не отправляем сейчас).
-    // 3. Если таймер есть и прошло 2 дня – отправляем обновление и обновляем таймер.
+    console.log('🔄 Проверка отправки профиля...');
+    console.log('profileSent:', appState.profile.profileSent);
+    console.log('lastSent:', appState.profile.lastSent);
 
+    // Логика:
     if (!appState.profile.profileSent) {
-        // Новый пользователь – отправляем сразу
         console.log('👤 Новый пользователь! Отправляем профиль админу...');
-        await sendProfileToAdmin();
-        // После отправки profileSent станет true, lastSent обновится
+        const sent = await sendProfileToAdmin();
+        if (sent) {
+            console.log('✅ Профиль успешно отправлен');
+        } else {
+            console.warn('⚠️ Не удалось отправить профиль, попробуем позже (сохраняем флаг)');
+            // Всё равно помечаем, чтобы не спамить при каждой загрузке, но можно повторить через минуту?
+            // Лучше не помечать, чтобы при следующей загрузке попробовать снова.
+            // Поэтому не устанавливаем profileSent = true, если ошибка.
+        }
     } else if (appState.profile.lastSent === 0) {
-        // Пользователь известен, но таймер не установлен – ставим таймер на текущее время (без отправки)
         console.log('⏳ Таймер не установлен, устанавливаем...');
         appState.profile.lastSent = Date.now();
         saveAppData();
     } else {
-        // Таймер есть – проверяем, прошло ли 2 дня
         if (shouldSendUpdate()) {
             console.log('📤 Прошло 2 дня – отправляем обновлённую статистику...');
             await sendProfileToAdmin();
