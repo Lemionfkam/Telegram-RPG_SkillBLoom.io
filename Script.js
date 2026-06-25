@@ -1,7 +1,7 @@
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 const STORAGE_KEY = 'app_data';
 let appState = {
-  profile: { name: '', age: '', avatarUrl: null, totalXP: 0, level: 1 },
+  profile: { name: '', avatarUrl: null, totalXP: 0, level: 1 },
   skills: []
 };
 
@@ -46,12 +46,12 @@ async function saveAppData() {
   }
 }
 
-// ========== АВТОРИЗАЦИЯ TELEGRAM (исправлена) ==========
+// ========== АВТОРИЗАЦИЯ TELEGRAM ==========
 function applyTelegramProfile() {
   if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
     const u = window.Telegram.WebApp.initDataUnsafe.user;
     let changed = false;
-    // Заполняем только если поля пустые – чтобы не перезаписывать введённое вручную
+    // Заполняем только если поля пустые – чтобы не перезаписывать, если уже есть
     if (u.first_name && !appState.profile.name) {
       appState.profile.name = u.first_name;
       changed = true;
@@ -61,7 +61,6 @@ function applyTelegramProfile() {
       changed = true;
     }
     if (changed) {
-      // Сохраняем данные сразу, чтобы они не потерялись
       saveAppData();
     }
   }
@@ -82,8 +81,8 @@ function getSkillCategory(skill) {
 
 // ========== ОТРИСОВКА ==========
 function renderProfile() {
-  document.getElementById('profile-name').value = appState.profile.name || '';
-  document.getElementById('profile-age').value = appState.profile.age || '';
+  // Отображаем имя (только для чтения)
+  document.getElementById('profile-name-text').textContent = appState.profile.name || '—';
   updateAvatar();
   updateLevelDisplay();
   renderMasteredSkills();
@@ -403,7 +402,7 @@ function showConfirm(title, message, onYes) {
 
 function resetData() {
   showConfirm('Сброс данных', 'Все данные будут удалены безвозвратно. Продолжить?', () => {
-    appState = { profile: { name: '', age: '', avatarUrl: null, totalXP: 0, level: 1 }, skills: [] };
+    appState = { profile: { name: '', avatarUrl: null, totalXP: 0, level: 1 }, skills: [] };
     saveAppData().then(renderAll);
   });
 }
@@ -429,12 +428,7 @@ function shareAchievement() {
 // ========== ПРИВЯЗКА СОБЫТИЙ ==========
 function bindEvents() {
   document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-  document.getElementById('profile-name').addEventListener('input', (e) => {
-    appState.profile.name = e.target.value; updateAvatar(); saveAppData();
-  });
-  document.getElementById('profile-age').addEventListener('input', (e) => {
-    appState.profile.age = e.target.value; saveAppData();
-  });
+  // Убираем обработчики для полей ввода – их больше нет
   document.getElementById('btn-add-skill').addEventListener('click', () => {
     document.getElementById('modal-skill').classList.remove('hidden');
     document.getElementById('skill-name-input').value = '';
@@ -494,7 +488,7 @@ function renderAll() {
 // ========== ЗАПУСК ==========
 (async () => {
   await loadAppData();
-  applyTelegramProfile(); // применяем данные из Telegram при загрузке
+  applyTelegramProfile();
   bindEvents();
   renderAll();
 })();
