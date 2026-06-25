@@ -413,4 +413,4 @@ header h1 {
 .skill-detail { margin-bottom: 10px; }
 .task-list-detail { list-style: none; margin: 4px 0 0 12px; font-size: 0.85rem; }
 .task-list-detail li.done { text-decoration: line-through; color: var(--text-secondary); }
-.admin-actions { margin-bottom: 12px; }
+.admin-actions { margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
