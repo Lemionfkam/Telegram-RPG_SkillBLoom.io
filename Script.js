@@ -6,8 +6,8 @@ let appState = {
         avatarUrl: null,
         totalXP: 0,
         level: 1,
-        profileSent: false,   // был ли отправлен профиль когда-либо
-        lastSent: 0           // timestamp последней отправки (0 = таймер не установлен)
+        profileSent: false,
+        lastSent: 0
     },
     skills: []
 };
@@ -17,7 +17,7 @@ const generateId = () => Date.now().toString(36) + Math.random().toString(36).su
 // ========== КОНФИГУРАЦИЯ ДЛЯ TELEGRAM ==========
 const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4';
 const ADMIN_ID = 1099017045;
-const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000; // 48 часов
+const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000;
 
 // ========== ХРАНИЛИЩЕ ==========
 function loadAppData() {
@@ -31,10 +31,12 @@ function loadAppData() {
             console.warn('Ошибка парсинга данных', e);
         }
     }
+    console.log('📥 Загружены данные:', appState);
 }
 
 function saveAppData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+    console.log('💾 Данные сохранены в localStorage');
 }
 
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -50,7 +52,7 @@ function getSkillCategory(skill) {
     return 'hard';
 }
 
-// ========== ОТРИСОВКА ==========
+// ========== ОТРИСОВКА (без изменений) ==========
 function renderProfile() {
     document.getElementById('profile-name').value = appState.profile.name || '';
     updateAvatar();
@@ -265,7 +267,7 @@ function completeTask(skill, taskId) {
     }
     appState.profile.totalXP += xp;
     skill.masteryPoints += xp;
-    checkLevelUp(); // внутри может вызвать отправку при повышении уровня
+    checkLevelUp();
     saveAppData();
     renderProfile();
     renderBubbles();
@@ -290,7 +292,6 @@ function checkLevelUp() {
     }
     if (levelUp) {
         showLevelUpFlash();
-        // Отправляем профиль при повышении уровня
         sendProfileToAdmin();
     }
 }
@@ -328,7 +329,6 @@ function popSkill(skillId) {
         skill.mastered = true;
         saveAppData();
         renderAll();
-        // Отправляем профиль после лопания пузыря
         sendProfileToAdmin();
     }, 600);
 }
@@ -361,9 +361,12 @@ function handleAvatarUpload(file) {
     reader.readAsDataURL(file);
 }
 
-// ========== ЭКСПОРТ/ИМПОРТ/СБРОС ==========
+// ========== ЭКСПОРТ/ИМПОРТ (исправленные) ==========
 function exportData() {
-    const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+    console.log('📤 Экспорт данных. Текущий appState:', appState);
+    const json = JSON.stringify(appState, null, 2);
+    console.log('📤 JSON для экспорта:', json);
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -377,12 +380,20 @@ function importData(file) {
     reader.onload = (e) => {
         try {
             const data = JSON.parse(e.target.result);
+            console.log('📥 Импортируемые данные:', data);
             showConfirm('Импорт данных', 'Перезаписать текущие данные?', () => {
                 appState = data;
+                // Убедимся, что поля profileSent и lastSent существуют
+                if (appState.profile.lastSent === undefined) appState.profile.lastSent = 0;
+                if (appState.profile.profileSent === undefined) appState.profile.profileSent = false;
                 saveAppData();
                 renderAll();
+                console.log('✅ Импорт завершён, интерфейс обновлён');
             });
-        } catch { alert('Неверный файл'); }
+        } catch (err) {
+            alert('❌ Неверный JSON-файл');
+            console.error('Ошибка парсинга:', err);
+        }
     };
     reader.readAsText(file);
 }
@@ -433,14 +444,19 @@ function shareAchievement() {
     });
 }
 
-// ========== ОТПРАВКА ПРОФИЛЯ В TELEGRAM (С JSON) ==========
+// ========== ОТПРАВКА ПРОФИЛЯ В TELEGRAM ==========
 async function sendProfileToAdmin() {
+    console.log('📤 [sendProfileToAdmin] Вызвана функция');
+    if (!BOT_TOKEN || !ADMIN_ID) {
+        console.error('❌ [sendProfileToAdmin] Ошибка: BOT_TOKEN или ADMIN_ID не заданы');
+        return false;
+    }
+
     try {
         const { name, level, totalXP } = appState.profile;
         const masteredSkills = appState.skills.filter(s => s.mastered).map(s => s.name);
         const activeSkills = appState.skills.filter(s => !s.mastered).map(s => `${s.name} (${getMasteryPercent(s).toFixed(0)}%)`);
 
-        // Красивое сообщение
         const message = `👤 *Обновление профиля SkillBloom*
 
 📛 *Имя:* ${name || 'Не указано'}
@@ -453,14 +469,13 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
 
 #skillbloom #обновление`;
 
-        // JSON-представление всего профиля
         const jsonString = JSON.stringify(appState, null, 2);
         const jsonBlock = `\n\n\`\`\`json\n${jsonString}\n\`\`\``;
-
-        // Отправляем красивое сообщение + JSON в одном сообщении
         const fullMessage = message + jsonBlock;
 
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        console.log('📤 [sendProfileToAdmin] Отправка запроса на:', url);
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -472,18 +487,20 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
         });
 
         const result = await response.json();
+        console.log('📥 [sendProfileToAdmin] Ответ Telegram:', result);
+
         if (result.ok) {
-            console.log('✅ Профиль отправлен админу с JSON');
+            console.log('✅ [sendProfileToAdmin] Профиль успешно отправлен!');
             appState.profile.lastSent = Date.now();
             appState.profile.profileSent = true;
             saveAppData();
             return true;
         } else {
-            console.error('❌ Ошибка отправки:', result);
+            console.error('❌ [sendProfileToAdmin] Ошибка от Telegram:', result.description);
             return false;
         }
     } catch (error) {
-        console.error('❌ Исключение при отправке:', error);
+        console.error('❌ [sendProfileToAdmin] Исключение:', error);
         return false;
     }
 }
@@ -492,14 +509,12 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
 function bindEvents() {
     document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
-    // Имя
     document.getElementById('profile-name').addEventListener('input', (e) => {
         appState.profile.name = e.target.value;
         updateAvatar();
         saveAppData();
     });
 
-    // Загрузка аватарки
     document.getElementById('btn-change-avatar').addEventListener('click', () => {
         document.getElementById('avatar-file-input').click();
     });
@@ -510,7 +525,6 @@ function bindEvents() {
         e.target.value = '';
     });
 
-    // Создание навыка
     document.getElementById('btn-add-skill').addEventListener('click', () => {
         document.getElementById('modal-skill').classList.remove('hidden');
         document.getElementById('skill-name-input').value = '';
@@ -524,8 +538,7 @@ function bindEvents() {
     function updateCategoryHint() {
         const days = parseInt(daysInput.value) || 10;
         const maxXP = days * 20;
-        let cat = '',
-            color = '';
+        let cat = '', color = '';
         if (maxXP <= 200) { cat = 'Лёгкий';
             color = 'var(--bronze)'; } else if (maxXP <= 600) { cat = 'Средний';
             color = 'var(--silver)'; } else { cat = 'Тяжёлый';
@@ -552,7 +565,6 @@ function bindEvents() {
         saveAppData();
         renderBubbles();
         document.getElementById('modal-skill').classList.add('hidden');
-        // Отправляем профиль после создания навыка
         sendProfileToAdmin();
     });
 
@@ -563,6 +575,20 @@ function bindEvents() {
     });
     document.getElementById('btn-reset').addEventListener('click', resetData);
     document.getElementById('btn-share').addEventListener('click', shareAchievement);
+
+    // Тестовая кнопка отправки
+    const actionsDiv = document.querySelector('.actions');
+    if (actionsDiv && !document.getElementById('btn-test-send')) {
+        const testBtn = document.createElement('button');
+        testBtn.id = 'btn-test-send';
+        testBtn.className = 'btn btn-accent';
+        testBtn.textContent = '📤 Тест отправки';
+        testBtn.style.marginTop = '10px';
+        actionsDiv.appendChild(testBtn);
+        testBtn.addEventListener('click', () => {
+            sendProfileToAdmin();
+        });
+    }
 
     document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.add('hidden')));
     document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
@@ -576,40 +602,14 @@ function renderAll() {
     renderTaskSkillList();
 }
 
-// ========== ИНИЦИАЛИЗАЦИЯ (первый запуск) ==========
-(async function init() {
-    loadAppData();
-    bindEvents();
-    renderAll();
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
+loadAppData();
+bindEvents();
+renderAll();
 
-    console.log('🔍 Инициализация SkillBloom');
-    console.log('📊 Профиль:', appState.profile);
-    console.log('📚 Навыков:', appState.skills.length);
-
-    const name = appState.profile.name;
-    if (!name) {
-        console.log('⏳ Имя не указано – отправка отложена.');
-        return;
-    }
-
-    // Отправка при первом запуске, если ещё не отправляли
-    if (!appState.profile.profileSent) {
-        console.log('👤 Первый запуск – отправка профиля...');
-        await sendProfileToAdmin();
-    } else if (appState.profile.lastSent === 0) {
-        // Если таймер не установлен – ставим
-        appState.profile.lastSent = Date.now();
-        saveAppData();
-    } else {
-        // Проверяем, прошло ли 2 дня с последней отправки (для периодических обновлений)
-        const now = Date.now();
-        if (now - appState.profile.lastSent >= SEND_INTERVAL_MS) {
-            console.log('📤 Прошло 2 дня – отправляем обновление...');
-            await sendProfileToAdmin();
-        } else {
-            const remaining = SEND_INTERVAL_MS - (now - appState.profile.lastSent);
-            const hours = Math.floor(remaining / 3600000);
-            console.log(`⏳ До следующей отправки: ~${hours} ч.`);
-        }
-    }
-})();
+if (appState.profile.name && !appState.profile.profileSent) {
+    console.log('👤 Первый запуск с именем – отправка профиля...');
+    setTimeout(() => {
+        sendProfileToAdmin();
+    }, 1000);
+}
