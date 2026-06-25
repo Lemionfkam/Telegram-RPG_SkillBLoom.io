@@ -1,6 +1,5 @@
-// ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И ИНИЦИАЛИЗАЦИЯ ==========
+// ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 const STORAGE_KEY = 'app_data';
-
 let appState = {
   profile: { name: '', age: '', avatarUrl: null, totalXP: 0, level: 1 },
   skills: []
@@ -8,6 +7,7 @@ let appState = {
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
+// Telegram Web App инициализация
 const isTelegramWebApp = typeof window.Telegram !== 'undefined' && window.Telegram.WebApp;
 if (isTelegramWebApp) {
   window.Telegram.WebApp.ready();
@@ -46,15 +46,12 @@ async function saveAppData() {
   }
 }
 
-// ========== АВТОРИЗАЦИЯ TELEGRAM ==========
+// ========== АВТОРИЗАЦИЯ TELEGRAM (исправлена) ==========
 function applyTelegramProfile() {
-  // В самом начале, после applyTelegramProfile:
-  if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
-    appState.profile.telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
-  }
   if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
     const u = window.Telegram.WebApp.initDataUnsafe.user;
     let changed = false;
+    // Заполняем только если поля пустые – чтобы не перезаписывать введённое вручную
     if (u.first_name && !appState.profile.name) {
       appState.profile.name = u.first_name;
       changed = true;
@@ -63,8 +60,8 @@ function applyTelegramProfile() {
       appState.profile.avatarUrl = u.photo_url;
       changed = true;
     }
-    // Если данные были заполнены – сохраняем
     if (changed) {
+      // Сохраняем данные сразу, чтобы они не потерялись
       saveAppData();
     }
   }
@@ -186,7 +183,7 @@ function renderTaskSkillList() {
 }
 
 // ========== ЕЖЕДНЕВНЫЙ ТАЙМЕР ==========
-const COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 часов
+const COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 function resetTimedDailyTasks(skill) {
   const now = Date.now();
@@ -329,17 +326,14 @@ function showLevelUpFlash() {
   setTimeout(() => flash.classList.add('hidden'), 1500);
 }
 
-// ========== ЛОПАНИЕ ПУЗЫРЯ С АНИМАЦИЕЙ ==========
+// ========== ЛОПАНИЕ ПУЗЫРЯ ==========
 function popSkill(skillId) {
   const skill = appState.skills.find(s => s.id === skillId);
   if (!skill || skill.mastered || getMasteryPercent(skill) < 100) return;
-
   const bubble = document.querySelector(`.skill-bubble[data-skill-id="${skillId}"]`);
   const wrapper = bubble?.closest('.bubble-wrapper');
   if (!bubble || !wrapper) return;
-
   bubble.classList.add('popping');
-
   const particleCount = 10;
   for (let i = 0; i < particleCount; i++) {
     const particle = document.createElement('div');
@@ -354,7 +348,6 @@ function popSkill(skillId) {
     wrapper.appendChild(particle);
     particle.addEventListener('animationend', () => particle.remove());
   }
-
   setTimeout(() => {
     bubble.classList.remove('popping');
     skill.mastered = true;
@@ -455,8 +448,7 @@ function bindEvents() {
   function updateCategoryHint() {
     const days = parseInt(daysInput.value) || 10;
     const maxXP = days * 20;
-    let cat = '';
-    let color = '';
+    let cat = '', color = '';
     if (maxXP <= 200) { cat = 'Лёгкий'; color = 'var(--bronze)'; }
     else if (maxXP <= 600) { cat = 'Средний'; color = 'var(--silver)'; }
     else { cat = 'Тяжёлый'; color = 'var(--gold)'; }
@@ -471,19 +463,14 @@ function bindEvents() {
     if (!name) return;
     const size = Math.floor(Math.random() * 61) + 100;
     appState.skills.push({
-      id: generateId(),
-      name,
-      masteryPoints: 0,
-      mastered: false,
-      masteryDays: days,
-      tasks: [],
-      bubbleSize: size
+      id: generateId(), name, masteryPoints: 0, mastered: false, masteryDays: days, tasks: [], bubbleSize: size
     });
     saveAppData().then(() => {
       renderBubbles();
       document.getElementById('modal-skill').classList.add('hidden');
     });
   });
+
   document.getElementById('btn-export').addEventListener('click', exportData);
   document.getElementById('btn-import').addEventListener('click', () => document.getElementById('import-file-input').click());
   document.getElementById('import-file-input').addEventListener('change', (e) => {
@@ -491,8 +478,10 @@ function bindEvents() {
   });
   document.getElementById('btn-reset').addEventListener('click', resetData);
   document.getElementById('btn-share').addEventListener('click', shareAchievement);
+
   document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.add('hidden')));
   document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
+
   appState.skills.forEach(skill => resetTimedDailyTasks(skill));
 }
 
@@ -502,9 +491,10 @@ function renderAll() {
   renderTaskSkillList();
 }
 
+// ========== ЗАПУСК ==========
 (async () => {
   await loadAppData();
-  applyTelegramProfile();
+  applyTelegramProfile(); // применяем данные из Telegram при загрузке
   bindEvents();
   renderAll();
 })();
