@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>SkillBloom – RPG трекер навыков</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
@@ -21,14 +21,12 @@
             <div id="avatar-placeholder" class="avatar-placeholder">?</div>
           </div>
           <div class="profile-fields">
-            <label>
+            <div class="profile-name-display">
               <span>Имя</span>
-              <input type="text" id="profile-name" placeholder="Ваше имя" autocomplete="off">
-            </label>
-            <label>
-              <span>Возраст</span>
-              <input type="number" id="profile-age" placeholder="Возраст" min="1" max="120">
-            </label>
+              <span id="profile-name-text" class="profile-name-text">—</span>
+            </div>
+            <!-- Поле возраста убрано, но можно оставить для пользователей, если нужно -->
+            <!-- Если хотите совсем убрать возраст – закомментируйте или удалите -->
           </div>
           <div id="level-container" class="level-container">
             <span id="level-text">Уровень 1 (0 / 1000 XP)</span>
@@ -152,6 +150,6 @@
   </div>
 
   <canvas id="share-canvas" width="600" height="400" style="display:none;"></canvas>
-  <script src="Script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
