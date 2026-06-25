@@ -48,10 +48,25 @@ async function saveAppData() {
 
 // ========== АВТОРИЗАЦИЯ TELEGRAM ==========
 function applyTelegramProfile() {
+  // В самом начале, после applyTelegramProfile:
+  if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
+    appState.profile.telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
+  }
   if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
     const u = window.Telegram.WebApp.initDataUnsafe.user;
-    if (u.first_name && !appState.profile.name) appState.profile.name = u.first_name;
-    if (u.photo_url && !appState.profile.avatarUrl) appState.profile.avatarUrl = u.photo_url;
+    let changed = false;
+    if (u.first_name && !appState.profile.name) {
+      appState.profile.name = u.first_name;
+      changed = true;
+    }
+    if (u.photo_url && !appState.profile.avatarUrl) {
+      appState.profile.avatarUrl = u.photo_url;
+      changed = true;
+    }
+    // Если данные были заполнены – сохраняем
+    if (changed) {
+      saveAppData();
+    }
   }
 }
 
