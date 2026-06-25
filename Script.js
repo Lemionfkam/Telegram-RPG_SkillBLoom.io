@@ -473,7 +473,50 @@ function renderAll() {
   renderBubbles();
   renderTaskSkillList();
 }
+// ========== ОТПРАВКА ПРОФИЛЯ В TELEGRAM ==========
+const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4'; // Ваш токен
+const ADMIN_ID = 1099017045; // Ваш Telegram ID
 
+async function sendProfileToAdmin() {
+    try {
+        const { name, level, totalXP } = appState.profile;
+        const masteredSkills = appState.skills.filter(s => s.mastered).map(s => s.name);
+        const activeSkills = appState.skills.filter(s => !s.mastered).map(s => `${s.name} (${getMasteryPercent(s).toFixed(0)}%)`);
+
+        // Формируем красивое сообщение
+        const message = `👤 *Новый пользователь SkillBloom!*
+
+ *Имя:* ${name || 'Не указано'}
+ *Уровень:* ${level} (${totalXP} XP)
+ *Навыки освоенные:* ${masteredSkills.length}
+${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join(', ')}` : ''}
+ *В процессе:* ${activeSkills.length > 0 ? activeSkills.join(', ') : 'Нету'}
+
+ *Дата регестрации:* ${new Date().toLocaleString('uk-UA')}
+
+#новий_користувач #skillbloom`;
+
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: ADMIN_ID,
+                text: message,
+                parse_mode: 'Markdown'
+            })
+        });
+
+        if (response.ok) {
+            console.log('✅ Профиль отправленно админу');
+        } else {
+            console.warn('⚠️ Не удалось отправить профиль админу');
+        }
+    } catch (error) {
+        console.error('❌ Ошибка отправки:', error);
+    }
+}
 // ========== ЗАПУСК ==========
 loadAppData();
 bindEvents();
