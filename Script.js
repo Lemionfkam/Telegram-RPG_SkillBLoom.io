@@ -1,11 +1,23 @@
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 const STORAGE_KEY = 'app_data';
 let appState = {
-  profile: { name: '', avatarUrl: null, totalXP: 0, level: 1 },
-  skills: []
+    profile: { 
+        name: '', 
+        avatarUrl: null, 
+        totalXP: 0, 
+        level: 1,
+        profileSent: false,   // был ли отправлен профиль когда-либо
+        lastSent: 0           // timestamp последней отправки (0 = таймер не установлен)
+    },
+    skills: []
 };
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+
+// ========== КОНФИГУРАЦИЯ ДЛЯ TELEGRAM ==========
+const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4'; // Ваш токен
+const ADMIN_ID = 1099017045; // Ваш Telegram ID
+const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000; // 48 часов (2 дня)
 
 // ========== ХРАНИЛИЩЕ ==========
 function loadAppData() {
@@ -13,6 +25,9 @@ function loadAppData() {
   if (localData) {
     try {
       appState = JSON.parse(localData);
+      // Инициализация новых полей, если их нет
+      if (appState.profile.lastSent === undefined) appState.profile.lastSent = 0;
+      if (appState.profile.profileSent === undefined) appState.profile.profileSent = false;
     } catch (e) {
       console.warn('Ошибка парсинга данных', e);
     }
@@ -372,7 +387,7 @@ function showConfirm(title, message, onYes) {
 
 function resetData() {
   showConfirm('Сброс данных', 'Все данные будут удалены безвозвратно. Продолжить?', () => {
-    appState = { profile: { name: '', avatarUrl: null, totalXP: 0, level: 1 }, skills: [] };
+    appState = { profile: { name: '', avatarUrl: null, totalXP: 0, level: 1, profileSent: false, lastSent: 0 }, skills: [] };
     saveAppData();
     renderAll();
   });
@@ -394,6 +409,62 @@ function shareAchievement() {
     const a = document.createElement('a'); a.href = url; a.download = 'achievement.png'; a.click();
     URL.revokeObjectURL(url);
   });
+}
+
+// ========== ОТПРАВКА ПРОФИЛЯ В TELEGRAM ==========
+async function sendProfileToAdmin() {
+    try {
+        const { name, level, totalXP } = appState.profile;
+        const masteredSkills = appState.skills.filter(s => s.mastered).map(s => s.name);
+        const activeSkills = appState.skills.filter(s => !s.mastered).map(s => `${s.name} (${getMasteryPercent(s).toFixed(0)}%)`);
+
+        const message = `👤 *Новый пользователь SkillBloom!*
+
+📛 *Имя:* ${name || 'Не указано'}
+🎯 *Уровень:* ${level} (${totalXP} XP)
+🏆 *Освоено навыков:* ${masteredSkills.length}
+${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join(', ')}` : ''}
+📈 *В процессе:* ${activeSkills.length > 0 ? activeSkills.join(', ') : 'Нету'}
+
+🕐 *Дата:* ${new Date().toLocaleString('uk-UA')}
+
+#новий_користувач #skillbloom`;
+
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: ADMIN_ID,
+                text: message,
+                parse_mode: 'Markdown'
+            })
+        });
+
+        if (response.ok) {
+            console.log('✅ Профиль отправлен админу');
+            // Обновляем timestamp отправки и флаг
+            appState.profile.lastSent = Date.now();
+            appState.profile.profileSent = true;
+            saveAppData();
+            return true;
+        } else {
+            console.warn('⚠️ Не удалось отправить профиль админу');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Ошибка отправки:', error);
+        return false;
+    }
+}
+
+// Проверка, нужно ли отправлять обновление (прошло 2 дня)
+function shouldSendUpdate() {
+    const now = Date.now();
+    const last = appState.profile.lastSent || 0;
+    if (last === 0) return false; // таймер не установлен
+    return (now - last) >= SEND_INTERVAL_MS;
 }
 
 // ========== ПРИВЯЗКА СОБЫТИЙ ==========
@@ -473,51 +544,43 @@ function renderAll() {
   renderBubbles();
   renderTaskSkillList();
 }
-// ========== ОТПРАВКА ПРОФИЛЯ В TELEGRAM ==========
-const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4'; // Ваш токен
-const ADMIN_ID = 1099017045; // Ваш Telegram ID
 
-async function sendProfileToAdmin() {
-    try {
-        const { name, level, totalXP } = appState.profile;
-        const masteredSkills = appState.skills.filter(s => s.mastered).map(s => s.name);
-        const activeSkills = appState.skills.filter(s => !s.mastered).map(s => `${s.name} (${getMasteryPercent(s).toFixed(0)}%)`);
-
-        // Формируем красивое сообщение
-        const message = `👤 *Новый пользователь SkillBloom!*
-
- *Имя:* ${name || 'Не указано'}
- *Уровень:* ${level} (${totalXP} XP)
- *Навыки освоенные:* ${masteredSkills.length}
-${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join(', ')}` : ''}
- *В процессе:* ${activeSkills.length > 0 ? activeSkills.join(', ') : 'Нету'}
-
- *Дата регестрации:* ${new Date().toLocaleString('uk-UA')}
-
-#новий_користувач #skillbloom`;
-
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: ADMIN_ID,
-                text: message,
-                parse_mode: 'Markdown'
-            })
-        });
-
-        if (response.ok) {
-            console.log('✅ Профиль отправленно админу');
-        } else {
-            console.warn('⚠️ Не удалось отправить профиль админу');
-        }
-    } catch (error) {
-        console.error('❌ Ошибка отправки:', error);
-    }
-}
 // ========== ЗАПУСК ==========
-loadAppData();
-bindEvents();
-renderAll();
+(async function init() {
+    loadAppData();
+    bindEvents();
+    renderAll();
+
+    const name = appState.profile.name;
+    if (!name) {
+        console.log('⏳ Имя не указано – отправка статистики отложена');
+        return;
+    }
+
+    // Логика таймера:
+    // 1. Если профиль ещё не отправлялся (profileSent === false) – отправляем сейчас и ставим таймер.
+    // 2. Если профиль уже отправлялся, но таймер не установлен (lastSent === 0) – просто ставим таймер (не отправляем сейчас).
+    // 3. Если таймер есть и прошло 2 дня – отправляем обновление и обновляем таймер.
+
+    if (!appState.profile.profileSent) {
+        // Новый пользователь – отправляем сразу
+        console.log('👤 Новый пользователь! Отправляем профиль админу...');
+        await sendProfileToAdmin();
+        // После отправки profileSent станет true, lastSent обновится
+    } else if (appState.profile.lastSent === 0) {
+        // Пользователь известен, но таймер не установлен – ставим таймер на текущее время (без отправки)
+        console.log('⏳ Таймер не установлен, устанавливаем...');
+        appState.profile.lastSent = Date.now();
+        saveAppData();
+    } else {
+        // Таймер есть – проверяем, прошло ли 2 дня
+        if (shouldSendUpdate()) {
+            console.log('📤 Прошло 2 дня – отправляем обновлённую статистику...');
+            await sendProfileToAdmin();
+        } else {
+            const remaining = SEND_INTERVAL_MS - (Date.now() - appState.profile.lastSent);
+            const hours = Math.floor(remaining / 3600000);
+            console.log(`⏳ До следующей отправки: ~${hours} ч.`);
+        }
+    }
+})();
