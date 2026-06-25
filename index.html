@@ -19,15 +19,18 @@
           <div class="avatar-wrapper" id="avatar-wrapper">
             <img id="avatar-img" src="" alt="Аватар" style="display:none;">
             <div id="avatar-placeholder" class="avatar-placeholder">?</div>
+            <!-- Кнопка загрузки аватарки -->
+            <button id="btn-change-avatar" class="btn btn-accent" style="position:absolute; bottom:0; right:0; padding:4px 8px; font-size:0.7rem; border-radius:50%; width:32px; height:32px;">📷</button>
           </div>
+          <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+
           <div class="profile-fields">
-            <div class="profile-name-display">
+            <label>
               <span>Имя</span>
-              <span id="profile-name-text" class="profile-name-text">—</span>
-            </div>
-            <!-- Поле возраста убрано, но можно оставить для пользователей, если нужно -->
-            <!-- Если хотите совсем убрать возраст – закомментируйте или удалите -->
+              <input type="text" id="profile-name" placeholder="Ваше имя" autocomplete="off">
+            </label>
           </div>
+
           <div id="level-container" class="level-container">
             <span id="level-text">Уровень 1 (0 / 1000 XP)</span>
             <div class="progress-bar"><div id="xp-bar-fill" class="fill"></div></div>
