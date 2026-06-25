@@ -41,7 +41,6 @@ body {
   position: relative;
 }
 
-/* Стеклянные панели */
 .glass-panel {
   background: rgba(20, 15, 45, 0.35);
   backdrop-filter: blur(16px);
@@ -51,7 +50,6 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Шапка */
 header {
   padding: 16px 20px;
   text-align: center;
@@ -66,7 +64,6 @@ header h1 {
   -webkit-text-fill-color: transparent;
 }
 
-/* Основной контент */
 #main-content {
   flex: 1;
   overflow-y: auto;
@@ -85,7 +82,6 @@ header h1 {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Нижняя навигация */
 .bottom-nav {
   position: fixed;
   bottom: 8px;
@@ -122,7 +118,6 @@ header h1 {
   background: rgba(0, 229, 255, 0.1);
 }
 
-/* Кнопки */
 .btn {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid var(--border-light);
@@ -152,7 +147,6 @@ header h1 {
   transform: scale(0.96);
 }
 
-/* Профиль */
 .profile-card {
   padding: 24px;
   text-align: center;
@@ -230,92 +224,47 @@ header h1 {
 }
 .level-up-flash {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: radial-gradient(circle, rgba(0,229,255,0.2) 0%, transparent 70%);
   pointer-events: none;
   animation: flash 1.5s ease-out;
 }
-.hidden {
-  display: none !important;
-}
+.hidden { display: none !important; }
 @keyframes flash {
   0% { opacity: 1; }
   100% { opacity: 0; }
 }
 
-.mastered-section {
-  padding: 16px;
-  margin-bottom: 16px;
-}
-.mastered-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
+.mastered-section { padding: 16px; margin-bottom: 16px; }
+.mastered-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .mastered-badge {
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  border: 1px solid;
+  padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; border: 1px solid;
 }
 .mastered-badge.easy {
-  background: rgba(205, 127, 50, 0.15);
-  border-color: var(--bronze);
-  color: var(--bronze);
+  background: rgba(205, 127, 50, 0.15); border-color: var(--bronze); color: var(--bronze);
 }
 .mastered-badge.medium {
-  background: rgba(192, 192, 192, 0.15);
-  border-color: var(--silver);
-  color: var(--silver);
+  background: rgba(192, 192, 192, 0.15); border-color: var(--silver); color: var(--silver);
 }
 .mastered-badge.hard {
-  background: rgba(255, 215, 0, 0.15);
-  border-color: var(--gold);
-  color: var(--gold);
+  background: rgba(255, 215, 0, 0.15); border-color: var(--gold); color: var(--gold);
 }
-.muted {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
+.muted { color: var(--text-secondary); font-size: 0.85rem; }
 
 .actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding: 16px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px;
 }
-.actions #btn-share {
-  grid-column: span 2;
-}
+.actions #btn-share { grid-column: span 2; }
 
-/* Секция заголовка (для вкладок Навыки и Задания) */
 .section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px;
 }
 
-/* Пузыри навыков */
+/* Пузыри */
 .bubbles-container {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 24px;
-  padding: 20px 0;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; padding: 20px 0;
 }
-.bubble-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+.bubble-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; }
 .skill-bubble {
   position: relative;
   width: var(--bubble-size, 120px);
@@ -324,54 +273,36 @@ header h1 {
   background: rgba(20, 15, 45, 0.5);
   backdrop-filter: blur(8px);
   border: 2px solid rgba(255,255,255,0.2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   cursor: pointer;
   transition: border-color var(--transition), box-shadow var(--transition);
   overflow: hidden;
   animation: wave-border 2.5s infinite ease-in-out;
 }
-.skill-bubble.ready,
-.skill-bubble.mastered {
+.skill-bubble.ready, .skill-bubble.mastered {
   animation: none;
   border-color: var(--gold);
   box-shadow: 0 0 15px rgba(255,215,0,0.4);
 }
 .skill-bubble.mastered::after {
-  content: '✓';
-  position: absolute;
-  top: 5px;
-  right: 10px;
-  font-size: 1.4rem;
-  color: var(--gold);
-  z-index: 3;
+  content: '✓'; position: absolute; top: 5px; right: 10px; font-size: 1.4rem; color: var(--gold); z-index: 3;
 }
 @keyframes wave-border {
   0%, 100% { border-radius: 50% 50% 45% 55% / 50% 50% 45% 55%; }
   50% { border-radius: 45% 55% 50% 50% / 45% 55% 50% 50%; }
 }
 
-/* Жидкость внутри пузыря */
 .skill-bubble::before {
   content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: absolute; bottom: 0; left: 0; right: 0;
   height: calc(var(--mastery-pct, 0) * 1%);
   background: linear-gradient(to top, rgba(0,229,255,0.75), rgba(0,229,255,0.2));
   border-radius: 40% 60% 50% 50% / 30% 40% 50% 60%;
   animation: wave-liquid 2s infinite ease-in-out;
   transition: height 0.6s ease;
 }
-.skill-bubble.ready::before,
-.skill-bubble.mastered::before {
-  animation: none;
-  border-radius: 50%;
-  background: rgba(0,229,255,0.5);
+.skill-bubble.ready::before, .skill-bubble.mastered::before {
+  animation: none; border-radius: 50%; background: rgba(0,229,255,0.5);
 }
 @keyframes wave-liquid {
   0%, 100% { border-radius: 40% 60% 50% 50% / 30% 40% 50% 60%; }
@@ -379,60 +310,30 @@ header h1 {
 }
 
 .skill-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  padding: 0 8px;
-  word-break: break-word;
-  hyphens: auto;
-  overflow-wrap: break-word;
-  position: relative;
-  z-index: 1;
+  font-weight: 600; font-size: 0.85rem; padding: 0 8px;
+  word-break: break-word; hyphens: auto; overflow-wrap: break-word;
+  position: relative; z-index: 1;
 }
 
 .pop-btn {
   margin-top: 10px;
-  background: var(--gold);
-  color: #0a0f1e;
-  border: none;
-  border-radius: 12px;
-  padding: 6px 16px;
-  font-size: 0.8rem;
-  font-weight: bold;
-  cursor: pointer;
-  white-space: nowrap;
-  z-index: 3;
+  background: var(--gold); color: #0a0f1e; border: none; border-radius: 12px;
+  padding: 6px 16px; font-size: 0.8rem; font-weight: bold; cursor: pointer; z-index: 3;
 }
 .delete-skill-btn {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: var(--danger);
-  border: none;
-  color: white;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  cursor: pointer;
-  z-index: 3;
+  position: absolute; top: -4px; right: -4px;
+  background: var(--danger); border: none; color: white;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; cursor: pointer; z-index: 3;
 }
 
-/* Анимация взлетающего пузыря */
+/* Анимации */
 .bubble-pop-particle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  background: rgba(0,229,255,0.8);
-  border-radius: 50%;
+  position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
+  background: rgba(0,229,255,0.8); border-radius: 50%;
   transform: translate(-50%, -50%) scale(0);
-  animation: bubble-fly 0.8s ease-out forwards;
-  pointer-events: none;
-  z-index: 10;
+  animation: bubble-fly 0.8s ease-out forwards; pointer-events: none; z-index: 10;
 }
 @keyframes bubble-fly {
   0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
@@ -440,200 +341,76 @@ header h1 {
   100% { transform: translate(-50%, -200%) scale(0.2); opacity: 0; }
 }
 
-/* Анимация лопания пузыря */
 .skill-bubble.popping {
-  animation: pop-bubble 0.6s ease-in forwards !important;
-  pointer-events: none;
+  animation: pop-bubble 0.6s ease-in forwards !important; pointer-events: none;
 }
-.skill-bubble.popping::before {
-  animation: none !important;
-  opacity: 0;
-}
+.skill-bubble.popping::before { animation: none !important; opacity: 0; }
 @keyframes pop-bubble {
   0% { transform: scale(1); opacity: 1; }
   30% { transform: scale(1.15); opacity: 0.8; }
   100% { transform: scale(0); opacity: 0; }
 }
 
-/* Частицы при лопании */
 .bubble-particle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 6px var(--gold);
+  position: absolute; top: 50%; left: 50%; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold);
   transform: translate(-50%, -50%);
-  animation: particle-fly 0.7s ease-out forwards;
-  pointer-events: none;
-  z-index: 20;
+  animation: particle-fly 0.7s ease-out forwards; pointer-events: none; z-index: 20;
 }
 @keyframes particle-fly {
   0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
 }
 
-/* Таймер обратного отсчёта для ежедневных */
-.cooldown-timer {
-  font-size: 0.75rem;
-  color: var(--accent);
-  margin-left: auto;
-  white-space: nowrap;
-}
+.cooldown-timer { font-size: 0.75rem; color: var(--accent); margin-left: auto; white-space: nowrap; }
 
 /* Задания */
-.tasks-skill-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
-}
+.tasks-skill-list { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .task-skill-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-light);
-  border-radius: 18px;
-  padding: 14px;
-  min-width: 140px;
-  flex: 1;
-  cursor: pointer;
-  transition: all var(--transition);
+  background: var(--bg-card); backdrop-filter: blur(8px); border: 1px solid var(--border-light);
+  border-radius: 18px; padding: 14px; min-width: 140px; flex: 1; cursor: pointer; transition: all var(--transition);
 }
-.task-skill-card:active {
-  transform: scale(0.97);
-}
+.task-skill-card:active { transform: scale(0.97); }
 
-/* Модальные окна */
-.modal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-.modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-}
+/* Модалки */
+.modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 200; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
 .modal-content {
-  position: relative;
-  width: 90%;
-  max-width: 380px;
-  padding: 24px;
-  border-radius: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  position: relative; width: 90%; max-width: 380px; padding: 24px; border-radius: 28px;
+  display: flex; flex-direction: column; gap: 16px;
 }
-.modal-content input,
-.modal-content select {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border-light);
-  color: white;
-  padding: 10px 14px;
-  border-radius: 14px;
-  outline: none;
-  font-size: 0.95rem;
+.modal-content input, .modal-content select {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border-light);
+  color: white; padding: 10px 14px; border-radius: 14px; outline: none; font-size: 0.95rem;
 }
 .styled-select {
-  background: #1a1030;
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 12px;
-  padding: 10px 14px;
-  appearance: none;
-  -webkit-appearance: none;
+  background: #1a1030; color: #fff; border: 1px solid rgba(255,255,255,0.25); border-radius: 12px;
+  padding: 10px 14px; appearance: none; -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='white' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 12px;
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;
 }
-.styled-select option {
-  background: #1a1030;
-  color: #fff;
-}
-.modal-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-.task-list {
-  list-style: none;
-  max-height: 250px;
-  overflow-y: auto;
-}
-.task-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.task-item.done .task-text {
-  text-decoration: line-through;
-  color: var(--text-secondary);
-}
-.task-text {
-  flex: 1;
-}
+.styled-select option { background: #1a1030; color: #fff; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.task-list { list-style: none; max-height: 250px; overflow-y: auto; }
+.task-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.task-item.done .task-text { text-decoration: line-through; color: var(--text-secondary); }
+.task-text { flex: 1; }
 
-/* Стили для админ-панели (admin.html) */
-.users-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-}
+/* Админ-панель (admin.html) */
+.users-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
 .user-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-light);
-  border-radius: 18px;
-  cursor: pointer;
-  transition: all var(--transition);
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(8px);
+  border: 1px solid var(--border-light); border-radius: 18px; cursor: pointer; transition: all var(--transition);
 }
-.user-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-.user-card-info {
-  display: flex;
-  flex-direction: column;
-}
+.user-card:hover { background: rgba(255, 255, 255, 0.1); }
+.user-card-info { display: flex; flex-direction: column; }
 .delete-user-btn {
-  background: rgba(255, 77, 106, 0.2);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  font-weight: bold;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  background: rgba(255, 77, 106, 0.2); border: 1px solid var(--danger); color: var(--danger);
+  font-weight: bold; width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.skill-detail {
-  margin-bottom: 10px;
-}
-.task-list-detail {
-  list-style: none;
-  margin: 4px 0 0 12px;
-  font-size: 0.85rem;
-}
-.task-list-detail li.done {
-  text-decoration: line-through;
-  color: var(--text-secondary);
-}
-.admin-actions {
-  margin-bottom: 12px;
-}
+.skill-detail { margin-bottom: 10px; }
+.task-list-detail { list-style: none; margin: 4px 0 0 12px; font-size: 0.85rem; }
+.task-list-detail li.done { text-decoration: line-through; color: var(--text-secondary); }
+.admin-actions { margin-bottom: 12px; }
