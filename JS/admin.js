@@ -1,13 +1,13 @@
 const STORAGE_KEY = 'admin_users';
-const ADMIN_ID = 1099017045; // ID администратора Telegram
+const ADMIN_ID = 1099017045;  // Ваш Telegram ID
 let adminUsers = [];
 
-// Проверка доступа
 function checkAccess() {
   const isTelegramWebApp = typeof window.Telegram !== 'undefined' && window.Telegram.WebApp;
   if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
-    if (window.Telegram.WebApp.initDataUnsafe.user.id !== ADMIN_ID) {
-      document.body.innerHTML = '<div style="color:white;text-align:center;margin-top:50px;">Доступ запрещён</div>';
+    const userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+    if (userId !== ADMIN_ID) {
+      document.body.innerHTML = `<div style="color:white;text-align:center;margin-top:50px;">Доступ запрещён. Ваш ID: ${userId}. Необходим ID: ${ADMIN_ID}</div>`;
       return false;
     }
   }
@@ -99,7 +99,6 @@ function openUserDetail(index) {
   document.getElementById('modal-user-detail').classList.remove('hidden');
 }
 
-// События
 document.getElementById('btn-load-user').addEventListener('click', () => {
   document.getElementById('admin-import-file').click();
 });
@@ -131,7 +130,6 @@ document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('cl
   b.parentElement.classList.add('hidden');
 }));
 
-// Старт
 if (checkAccess()) {
   loadAdminUsers();
 }
