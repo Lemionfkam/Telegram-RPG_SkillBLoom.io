@@ -7,63 +7,21 @@ let appState = {
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
-// Telegram Web App инициализация
-const isTelegramWebApp = typeof window.Telegram !== 'undefined' && window.Telegram.WebApp;
-if (isTelegramWebApp) {
-  window.Telegram.WebApp.ready();
-  window.Telegram.WebApp.expand();
-}
-
 // ========== ХРАНИЛИЩЕ ==========
-async function loadAppData() {
-  if (isTelegramWebApp && window.Telegram.WebApp.CloudStorage) {
-    try {
-      const cloudData = await new Promise((resolve, reject) => {
-        window.Telegram.WebApp.CloudStorage.getItem(STORAGE_KEY, (err, value) => {
-          if (err) reject(err);
-          else resolve(value);
-        });
-      });
-      if (cloudData) { appState = JSON.parse(cloudData); return; }
-    } catch (e) { console.warn('CloudStorage load failed', e); }
-  }
+function loadAppData() {
   const localData = localStorage.getItem(STORAGE_KEY);
-  if (localData) appState = JSON.parse(localData);
+  if (localData) {
+    try {
+      appState = JSON.parse(localData);
+    } catch (e) {
+      console.warn('Ошибка парсинга данных', e);
+    }
+  }
 }
 
-async function saveAppData() {
+function saveAppData() {
   const json = JSON.stringify(appState);
   localStorage.setItem(STORAGE_KEY, json);
-  if (isTelegramWebApp && window.Telegram.WebApp.CloudStorage) {
-    try {
-      await new Promise((resolve, reject) => {
-        window.Telegram.WebApp.CloudStorage.setItem(STORAGE_KEY, json, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    } catch (e) { console.warn('CloudStorage save failed', e); }
-  }
-}
-
-// ========== АВТОРИЗАЦИЯ TELEGRAM ==========
-function applyTelegramProfile() {
-  if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
-    const u = window.Telegram.WebApp.initDataUnsafe.user;
-    let changed = false;
-    // Заполняем только если поля пустые – чтобы не перезаписывать, если уже есть
-    if (u.first_name && !appState.profile.name) {
-      appState.profile.name = u.first_name;
-      changed = true;
-    }
-    if (u.photo_url && !appState.profile.avatarUrl) {
-      appState.profile.avatarUrl = u.photo_url;
-      changed = true;
-    }
-    if (changed) {
-      saveAppData();
-    }
-  }
 }
 
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -81,8 +39,7 @@ function getSkillCategory(skill) {
 
 // ========== ОТРИСОВКА ==========
 function renderProfile() {
-  // Отображаем имя (только для чтения)
-  document.getElementById('profile-name-text').textContent = appState.profile.name || '—';
+  document.getElementById('profile-name').value = appState.profile.name || '';
   updateAvatar();
   updateLevelDisplay();
   renderMasteredSkills();
@@ -369,6 +326,18 @@ function switchTab(tabName) {
   if (tabName === 'tasks') renderTaskSkillList();
 }
 
+// ========== ЗАГРУЗКА АВАТАРКИ ==========
+function handleAvatarUpload(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    appState.profile.avatarUrl = e.target.result;
+    saveAppData();
+    updateAvatar();
+  };
+  reader.readAsDataURL(file);
+}
+
 // ========== ЭКСПОРТ/ИМПОРТ/СБРОС ==========
 function exportData() {
   const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
@@ -428,7 +397,26 @@ function shareAchievement() {
 // ========== ПРИВЯЗКА СОБЫТИЙ ==========
 function bindEvents() {
   document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-  // Убираем обработчики для полей ввода – их больше нет
+  
+  // Имя
+  document.getElementById('profile-name').addEventListener('input', (e) => {
+    appState.profile.name = e.target.value;
+    updateAvatar(); // обновляем инициал в плейсхолдере
+    saveAppData();
+  });
+
+  // Загрузка аватарки
+  document.getElementById('btn-change-avatar').addEventListener('click', () => {
+    document.getElementById('avatar-file-input').click();
+  });
+  document.getElementById('avatar-file-input').addEventListener('change', (e) => {
+    if (e.target.files[0]) {
+      handleAvatarUpload(e.target.files[0]);
+    }
+    e.target.value = ''; // сброс, чтобы можно было выбрать тот же файл повторно
+  });
+
+  // Создание навыка
   document.getElementById('btn-add-skill').addEventListener('click', () => {
     document.getElementById('modal-skill').classList.remove('hidden');
     document.getElementById('skill-name-input').value = '';
@@ -486,9 +474,6 @@ function renderAll() {
 }
 
 // ========== ЗАПУСК ==========
-(async () => {
-  await loadAppData();
-  applyTelegramProfile();
-  bindEvents();
-  renderAll();
-})();
+loadAppData();
+bindEvents();
+renderAll();
