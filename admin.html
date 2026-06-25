@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SkillBloom – Админ-панель</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="glass-panel">
+      <h1>Админ-панель</h1>
+    </header>
+
+    <main id="main-content">
+      <section class="tab-content active">
+        <div class="admin-panel glass-panel">
+          <h2>Загруженные пользователи</h2>
+          <div class="admin-actions">
+            <button id="btn-load-user" class="btn btn-accent">Загрузить JSON пользователя</button>
+            <input type="file" id="admin-import-file" accept=".json" multiple style="display:none;">
+          </div>
+          <div id="users-list" class="users-list">
+            <p class="muted">Нет загруженных пользователей</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Модальное окно деталей пользователя -->
+  <div id="modal-user-detail" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content glass-panel" style="max-width: 450px; max-height: 80vh; overflow-y: auto;">
+      <div id="user-detail-content"></div>
+      <div class="modal-actions">
+        <button class="btn modal-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="JS/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+// ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И ИНИЦИАЛИЗАЦИЯ ==========
+const STORAGE_KEY = 'app_data';
+
+let appState = {
+  profile: { name: '', age: '', avatarUrl: null, totalXP: 0, level: 1 },
+  skills: []
+};
+
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+
+const isTelegramWebApp = typeof window.Telegram !== 'undefined' && window.Telegram.WebApp;
+if (isTelegramWebApp) {
+  window.Telegram.WebApp.ready();
+  window.Telegram.WebApp.expand();
+}
+
+// ========== ХРАНИЛИЩЕ ==========
+async function loadAppData() {
+  if (isTelegramWebApp && window.Telegram.WebApp.CloudStorage) {
+    try {
+      const cloudData = await new Promise((resolve, reject) => {
+        window.Telegram.WebApp.CloudStorage.getItem(STORAGE_KEY, (err, value) => {
+          if (err) reject(err);
+          else resolve(value);
+        });
+      });
+      if (cloudData) { appState = JSON.parse(cloudData); return; }
+    } catch (e) { console.warn('CloudStorage load failed', e); }
+  }
+  const localData = localStorage.getItem(STORAGE_KEY);
+  if (localData) appState = JSON.parse(localData);
+}
+
+async function saveAppData() {
+  const json = JSON.stringify(appState);
+  localStorage.setItem(STORAGE_KEY, json);
+  if (isTelegramWebApp && window.Telegram.WebApp.CloudStorage) {
+    try {
+      await new Promise((resolve, reject) => {
+        window.Telegram.WebApp.CloudStorage.setItem(STORAGE_KEY, json, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    } catch (e) { console.warn('CloudStorage save failed', e); }
+  }
+}
+
+// ========== АВТОРИЗАЦИЯ TELEGRAM ==========
+function applyTelegramProfile() {
+  if (isTelegramWebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
+    const u = window.Telegram.WebApp.initDataUnsafe.user;
+    if (u.first_name && !appState.profile.name) appState.profile.name = u.first_name;
+    if (u.photo_url && !appState.profile.avatarUrl) appState.profile.avatarUrl = u.photo_url;
+  }
+}
+
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+function getMaxMastery(skill) { return (skill.masteryDays || 10) * 20; }
+function getMasteryPercent(skill) {
+  const max = getMaxMastery(skill);
+  return Math.min(100, (skill.masteryPoints / max) * 100);
+}
+function getSkillCategory(skill) {
+  const max = getMaxMastery(skill);
+  if (max <= 200) return 'easy';
+  if (max <= 600) return 'medium';
+  return 'hard';
+}
+
+// ========== ОТРИСОВКА ==========
+function renderProfile() {
+  document.getElementById('profile-name').value = appState.profile.name || '';
+  document.getElementById('profile-age').value = appState.profile.age || '';
+  updateAvatar();
+  updateLevelDisplay();
+  renderMasteredSkills();
+}
+
+function updateAvatar() {
+  const img = document.getElementById('avatar-img');
+  const placeholder = document.getElementById('avatar-placeholder');
+  if (appState.profile.avatarUrl) {
+    img.src = appState.profile.avatarUrl;
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    placeholder.textContent = appState.profile.name?.charAt(0)?.toUpperCase() || '?';
+    placeholder.style.display = 'flex';
+  }
+}
+
+function updateLevelDisplay() {
+  const { level, totalXP } = appState.profile;
+  const requiredXP = 1000 * level;
+  const currentXP = totalXP % requiredXP;
+  document.getElementById('level-text').textContent = `Уровень ${level} (${currentXP} / ${requiredXP} XP)`;
+  document.getElementById('xp-bar-fill').style.width = `${(currentXP / requiredXP) * 100}%`;
+}
+
+function renderMasteredSkills() {
+  const list = document.getElementById('mastered-list');
+  const msg = document.getElementById('no-mastered-msg');
+  const mastered = appState.skills.filter(s => s.mastered);
+  list.innerHTML = mastered.map(s => {
+    const cat = getSkillCategory(s);
+    return `<span class="mastered-badge ${cat}">${s.name}</span>`;
+  }).join('');
+  msg.classList.toggle('hidden', mastered.length > 0);
+}
+
+function renderBubbles() {
+  const container = document.getElementById('bubbles-container');
+  const skills = appState.skills.filter(s => !s.mastered);
+  container.innerHTML = skills.map(skill => {
+    const size = skill.bubbleSize || 120;
+    const pct = getMasteryPercent(skill);
+    const ready = pct >= 100;
+    return `
+      <div class="bubble-wrapper">
+        <div class="skill-bubble ${ready ? 'ready' : ''}"
+             style="--bubble-size:${size}px; --mastery-pct:${pct};"
+             data-skill-id="${skill.id}">
+          <span class="skill-name">${skill.name}</span>
+          ${!skill.mastered ? `<button class="delete-skill-btn">×</button>` : ''}
+        </div>
+        ${ready ? '<button class="pop-btn">Лопнуть</button>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.pop-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const skillId = btn.closest('.bubble-wrapper').querySelector('.skill-bubble').dataset.skillId;
+      popSkill(skillId);
+    });
+  });
+  container.querySelectorAll('.delete-skill-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteSkill(btn.closest('.skill-bubble').dataset.skillId);
+    });
+  });
+  container.querySelectorAll('.skill-bubble').forEach(b => {
+    b.addEventListener('click', () => {
+      openTasksForSkill(b.dataset.skillId);
+      switchTab('tasks');
+    });
+  });
+}
+
+function renderTaskSkillList() {
+  const list = document.getElementById('tasks-skill-list');
+  const activeSkills = appState.skills.filter(s => !s.mastered);
+  list.innerHTML = activeSkills.map(s => {
+    const pct = getMasteryPercent(s);
+    const max = getMaxMastery(s);
+    return `
+      <div class="task-skill-card" data-skill-id="${s.id}">
+        <strong>${s.name}</strong>
+        <div class="progress-bar" style="margin-top:6px;"><div class="fill" style="width:${pct}%"></div></div>
+        <small class="muted">${s.masteryPoints} / ${max} XP</small>
+      </div>
+    `;
+  }).join('');
+  list.querySelectorAll('.task-skill-card').forEach(c => {
+    c.addEventListener('click', () => openTasksForSkill(c.dataset.skillId));
+  });
+}
+
+// ========== ЕЖЕДНЕВНЫЙ ТАЙМЕР ==========
+const COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 часов
+
+function resetTimedDailyTasks(skill) {
+  const now = Date.now();
+  skill.tasks.forEach(t => {
+    if (t.type === 'daily' && t.done && t.doneTimestamp && (now - t.doneTimestamp >= COOLDOWN_MS)) {
+      t.done = false;
+      t.doneTimestamp = null;
+    }
+  });
+}
+
+let timerInterval = null;
+function startGlobalTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    document.querySelectorAll('.cooldown-timer').forEach(el => {
+      const exp = parseInt(el.dataset.expire);
+      const now = Date.now();
+      const remaining = Math.max(0, exp - now);
+      if (remaining <= 0) {
+        el.textContent = '';
+      } else {
+        const h = Math.floor(remaining / 3600000);
+        const m = Math.floor((remaining % 3600000) / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        el.textContent = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+      }
+    });
+  }, 1000);
+}
+
+// ========== РАБОТА С ЗАДАНИЯМИ ==========
+function openTasksForSkill(skillId) {
+  const skill = appState.skills.find(s => s.id === skillId);
+  if (!skill) return;
+  resetTimedDailyTasks(skill);
+  const max = getMaxMastery(skill);
+  document.getElementById('task-skill-title').textContent = skill.name;
+  document.getElementById('task-mastery-text').textContent = `Мастерство: ${skill.masteryPoints} / ${max} XP`;
+  document.getElementById('task-mastery-fill').style.width = `${getMasteryPercent(skill)}%`;
+
+  const now = Date.now();
+  const taskListEl = document.getElementById('task-list');
+  taskListEl.innerHTML = skill.tasks.map(task => {
+    let disabled = false;
+    let cooldownHTML = '';
+    if (task.done) {
+      if (task.type === 'single') disabled = true;
+      else if (task.type === 'daily') {
+        const remaining = task.doneTimestamp + COOLDOWN_MS - now;
+        if (remaining > 0) {
+          disabled = true;
+          const h = Math.floor(remaining / 3600000);
+          const m = Math.floor((remaining % 3600000) / 60000);
+          const s = Math.floor((remaining % 60000) / 1000);
+          cooldownHTML = `<span class="cooldown-timer" data-expire="${task.doneTimestamp + COOLDOWN_MS}">${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}</span>`;
+        } else {
+          task.done = false; task.doneTimestamp = null;
+        }
+      }
+    }
+    return `
+      <li class="task-item ${task.done ? 'done' : ''}" data-task-id="${task.id}">
+        <input type="checkbox" ${task.done ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+        <span class="task-text">${task.text} (${task.xp} XP, ${task.type})</span>
+        ${cooldownHTML}
+      </li>
+    `;
+  }).join('');
+
+  taskListEl.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const taskId = e.target.closest('.task-item').dataset.taskId;
+      completeTask(skill, taskId);
+    });
+  });
+
+  document.getElementById('btn-add-task').onclick = () => {
+    const text = document.getElementById('new-task-text').value.trim();
+    if (!text) return;
+    const type = document.getElementById('task-type-select').value;
+    const difficulty = document.getElementById('task-difficulty-select').value;
+    const xpMap = { easy: 5, medium: 10, hard: 20 };
+    const xp = xpMap[difficulty];
+    skill.tasks.push({ id: generateId(), text, type, difficulty, xp, done: false, doneTimestamp: null });
+    document.getElementById('new-task-text').value = '';
+    saveAppData().then(() => {
+      openTasksForSkill(skillId);
+      renderBubbles();
+      renderTaskSkillList();
+    });
+  };
+
+  document.getElementById('modal-tasks').classList.remove('hidden');
+  startGlobalTimer();
+}
+
+function completeTask(skill, taskId) {
+  const task = skill.tasks.find(t => t.id === taskId);
+  if (!task || task.done) return;
+  task.done = true;
+  if (task.type === 'daily') {
+    task.doneTimestamp = Date.now();
+  }
+  const xp = task.xp;
+  const max = getMaxMastery(skill);
+  if (xp > 0.2 * max) {
+    const bubbleEl = document.querySelector(`.skill-bubble[data-skill-id="${skill.id}"]`);
+    if (bubbleEl) spawnBubbleParticle(bubbleEl);
+  }
+  appState.profile.totalXP += xp;
+  skill.masteryPoints += xp;
+  checkLevelUp();
+  saveAppData().then(() => {
+    renderProfile();
+    renderBubbles();
+    renderTaskSkillList();
+    openTasksForSkill(skill.id);
+  });
+}
+
+function spawnBubbleParticle(bubbleEl) {
+  const particle = document.createElement('div');
+  particle.className = 'bubble-pop-particle';
+  bubbleEl.appendChild(particle);
+  particle.addEventListener('animationend', () => particle.remove());
+}
+
+// ========== УРОВНИ ==========
+function checkLevelUp() {
+  const prev = appState.profile.level;
+  while (appState.profile.totalXP >= 1000 * appState.profile.level) {
+    appState.profile.level++;
+  }
+  if (appState.profile.level > prev) showLevelUpFlash();
+}
+function showLevelUpFlash() {
+  const flash = document.getElementById('level-up-flash');
+  flash.classList.remove('hidden');
+  setTimeout(() => flash.classList.add('hidden'), 1500);
+}
+
+// ========== ЛОПАНИЕ ПУЗЫРЯ С АНИМАЦИЕЙ ==========
+function popSkill(skillId) {
+  const skill = appState.skills.find(s => s.id === skillId);
+  if (!skill || skill.mastered || getMasteryPercent(skill) < 100) return;
+
+  const bubble = document.querySelector(`.skill-bubble[data-skill-id="${skillId}"]`);
+  const wrapper = bubble?.closest('.bubble-wrapper');
+  if (!bubble || !wrapper) return;
+
+  bubble.classList.add('popping');
+
+  const particleCount = 10;
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'bubble-particle';
+    const angle = (i / particleCount) * 360 + Math.random() * 30;
+    const distance = 40 + Math.random() * 60;
+    const tx = Math.cos(angle * Math.PI / 180) * distance + 'px';
+    const ty = Math.sin(angle * Math.PI / 180) * distance + 'px';
+    particle.style.setProperty('--tx', tx);
+    particle.style.setProperty('--ty', ty);
+    particle.style.animationDelay = Math.random() * 0.2 + 's';
+    wrapper.appendChild(particle);
+    particle.addEventListener('animationend', () => particle.remove());
+  }
+
+  setTimeout(() => {
+    bubble.classList.remove('popping');
+    skill.mastered = true;
+    saveAppData().then(renderAll);
+  }, 600);
+}
+
+function deleteSkill(skillId) {
+  if (!confirm('Удалить навык? Задания будут потеряны.')) return;
+  appState.skills = appState.skills.filter(s => s.id !== skillId);
+  saveAppData().then(renderAll);
+}
+
+// ========== ВКЛАДКИ ==========
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${tabName}`).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.nav-btn[data-tab="${tabName}"]`).classList.add('active');
+  if (tabName === 'tasks') renderTaskSkillList();
+}
+
+// ========== ЭКСПОРТ/ИМПОРТ/СБРОС ==========
+function exportData() {
+  const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'skillbloom_backup.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      showConfirm('Импорт данных', 'Перезаписать текущие данные?', () => {
+        appState = data;
+        saveAppData().then(renderAll);
+      });
+    } catch { alert('Неверный файл'); }
+  };
+  reader.readAsText(file);
+}
+
+function showConfirm(title, message, onYes) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  const modal = document.getElementById('modal-confirm');
+  modal.classList.remove('hidden');
+  document.getElementById('confirm-yes').onclick = () => { modal.classList.add('hidden'); onYes(); };
+}
+
+function resetData() {
+  showConfirm('Сброс данных', 'Все данные будут удалены безвозвратно. Продолжить?', () => {
+    appState = { profile: { name: '', age: '', avatarUrl: null, totalXP: 0, level: 1 }, skills: [] };
+    saveAppData().then(renderAll);
+  });
+}
+
+function shareAchievement() {
+  const canvas = document.getElementById('share-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 600, 400);
+  ctx.fillStyle = '#0a0f1e'; ctx.fillRect(0, 0, 600, 400);
+  ctx.fillStyle = '#00E5FF'; ctx.font = 'bold 28px sans-serif';
+  ctx.fillText(appState.profile.name || 'Герой', 40, 80);
+  ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif';
+  ctx.fillText(`Уровень ${appState.profile.level} (${appState.profile.totalXP} XP)`, 40, 140);
+  const mastered = appState.skills.filter(s => s.mastered).map(s => s.name).join(', ');
+  ctx.fillText('Освоено: ' + (mastered || 'ничего'), 40, 200);
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'achievement.png'; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+// ========== ПРИВЯЗКА СОБЫТИЙ ==========
+function bindEvents() {
+  document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+  document.getElementById('profile-name').addEventListener('input', (e) => {
+    appState.profile.name = e.target.value; updateAvatar(); saveAppData();
+  });
+  document.getElementById('profile-age').addEventListener('input', (e) => {
+    appState.profile.age = e.target.value; saveAppData();
+  });
+  document.getElementById('btn-add-skill').addEventListener('click', () => {
+    document.getElementById('modal-skill').classList.remove('hidden');
+    document.getElementById('skill-name-input').value = '';
+    document.getElementById('skill-days-input').value = 10;
+    updateCategoryHint();
+  });
+
+  const daysInput = document.getElementById('skill-days-input');
+  daysInput.addEventListener('input', updateCategoryHint);
+
+  function updateCategoryHint() {
+    const days = parseInt(daysInput.value) || 10;
+    const maxXP = days * 20;
+    let cat = '';
+    let color = '';
+    if (maxXP <= 200) { cat = 'Лёгкий'; color = 'var(--bronze)'; }
+    else if (maxXP <= 600) { cat = 'Средний'; color = 'var(--silver)'; }
+    else { cat = 'Тяжёлый'; color = 'var(--gold)'; }
+    const hintEl = document.getElementById('skill-category-hint');
+    hintEl.textContent = `Сложность: ${cat} (${maxXP} XP)`;
+    hintEl.style.color = color;
+  }
+
+  document.getElementById('skill-save-btn').addEventListener('click', () => {
+    const name = document.getElementById('skill-name-input').value.trim();
+    const days = parseInt(document.getElementById('skill-days-input').value, 10) || 10;
+    if (!name) return;
+    const size = Math.floor(Math.random() * 61) + 100;
+    appState.skills.push({
+      id: generateId(),
+      name,
+      masteryPoints: 0,
+      mastered: false,
+      masteryDays: days,
+      tasks: [],
+      bubbleSize: size
+    });
+    saveAppData().then(() => {
+      renderBubbles();
+      document.getElementById('modal-skill').classList.add('hidden');
+    });
+  });
+  document.getElementById('btn-export').addEventListener('click', exportData);
+  document.getElementById('btn-import').addEventListener('click', () => document.getElementById('import-file-input').click());
+  document.getElementById('import-file-input').addEventListener('change', (e) => {
+    if (e.target.files[0]) importData(e.target.files[0]);
+  });
+  document.getElementById('btn-reset').addEventListener('click', resetData);
+  document.getElementById('btn-share').addEventListener('click', shareAchievement);
+  document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.add('hidden')));
+  document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
+  appState.skills.forEach(skill => resetTimedDailyTasks(skill));
+}
+
+function renderAll() {
+  renderProfile();
+  renderBubbles();
+  renderTaskSkillList();
+}
+
+(async () => {
+  await loadAppData();
+  applyTelegramProfile();
+  bindEvents();
+  renderAll();
+})();

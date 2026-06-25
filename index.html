@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SkillBloom – RPG трекер навыков</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="glass-panel">
+      <h1>SkillBloom</h1>
+    </header>
+
+    <main id="main-content">
+      <!-- Вкладка Профиль -->
+      <section id="tab-profile" class="tab-content active">
+        <div class="profile-card glass-panel">
+          <div class="avatar-wrapper" id="avatar-wrapper">
+            <img id="avatar-img" src="" alt="Аватар" style="display:none;">
+            <div id="avatar-placeholder" class="avatar-placeholder">?</div>
+          </div>
+          <div class="profile-fields">
+            <label>
+              <span>Имя</span>
+              <input type="text" id="profile-name" placeholder="Ваше имя" autocomplete="off">
+            </label>
+            <label>
+              <span>Возраст</span>
+              <input type="number" id="profile-age" placeholder="Возраст" min="1" max="120">
+            </label>
+          </div>
+          <div id="level-container" class="level-container">
+            <span id="level-text">Уровень 1 (0 / 1000 XP)</span>
+            <div class="progress-bar"><div id="xp-bar-fill" class="fill"></div></div>
+          </div>
+          <div id="level-up-flash" class="level-up-flash hidden"></div>
+        </div>
+
+        <div class="mastered-section glass-panel">
+          <h2>Освоенные навыки</h2>
+          <div id="mastered-list" class="mastered-list"></div>
+          <p id="no-mastered-msg" class="muted">Пока ничего не освоено</p>
+        </div>
+
+        <div class="actions glass-panel">
+          <button id="btn-share" class="btn btn-accent">Поделиться</button>
+          <button id="btn-export" class="btn">Экспорт</button>
+          <button id="btn-import" class="btn">Импорт</button>
+          <input type="file" id="import-file-input" accept=".json" style="display:none;">
+          <button id="btn-reset" class="btn btn-danger">Сброс данных</button>
+        </div>
+      </section>
+
+      <!-- Вкладка Навыки -->
+      <section id="tab-skills" class="tab-content">
+        <div class="section-header">
+          <h2>Древо навыков</h2>
+          <button id="btn-add-skill" class="btn btn-accent">+ Новый навык</button>
+        </div>
+        <div id="bubbles-container" class="bubbles-container"></div>
+      </section>
+
+      <!-- Вкладка Задания -->
+      <section id="tab-tasks" class="tab-content">
+        <div class="section-header">
+          <h2>Мои задания</h2>
+          <p class="muted">Выберите навык, чтобы увидеть задания</p>
+        </div>
+        <div id="tasks-skill-list" class="tasks-skill-list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav glass-panel">
+      <button class="nav-btn active" data-tab="profile">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Профиль</span>
+      </button>
+      <button class="nav-btn" data-tab="skills">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span>Навыки</span>
+      </button>
+      <button class="nav-btn" data-tab="tasks">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Задания</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Модальное окно "Новый навык" -->
+  <div id="modal-skill" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content glass-panel">
+      <h3>Создать навык</h3>
+      <input type="text" id="skill-name-input" placeholder="Название навыка" maxlength="30">
+      <label style="display:flex; flex-direction:column; gap:4px; color:var(--text-secondary);">
+        <span>Сколько дней нужно для освоения?</span>
+        <input type="number" id="skill-days-input" placeholder="Например: 10" min="1" max="365" value="10" style="color:white;">
+      </label>
+      <p id="skill-category-hint" class="muted" style="text-align:center;"></p>
+      <div class="modal-actions">
+        <button id="skill-save-btn" class="btn btn-accent">Создать</button>
+        <button class="btn modal-close">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно заданий для выбранного навыка -->
+  <div id="modal-tasks" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content glass-panel" style="max-width: 450px;">
+      <div id="task-skill-header">
+        <h3 id="task-skill-title"></h3>
+        <div class="mastery-progress">
+          <span id="task-mastery-text"></span>
+          <div class="progress-bar"><div id="task-mastery-fill" class="fill"></div></div>
+        </div>
+      </div>
+      <div class="task-add-form">
+        <input type="text" id="new-task-text" placeholder="Описание задания" maxlength="40">
+        <div class="select-group">
+          <select id="task-type-select" class="styled-select">
+            <option value="daily">Ежедневное</option>
+            <option value="single">Одноразовое</option>
+          </select>
+          <select id="task-difficulty-select" class="styled-select">
+            <option value="easy">Лёгкое (+5 XP)</option>
+            <option value="medium">Среднее (+10 XP)</option>
+            <option value="hard">Тяжёлое (+20 XP)</option>
+          </select>
+        </div>
+        <button id="btn-add-task" class="btn btn-accent">Добавить задание</button>
+      </div>
+      <ul id="task-list" class="task-list"></ul>
+      <div class="modal-actions">
+        <button class="btn modal-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно подтверждения сброса -->
+  <div id="modal-confirm" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content glass-panel">
+      <h3 id="confirm-title"></h3>
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button id="confirm-yes" class="btn btn-danger">Да</button>
+        <button class="btn modal-close">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="share-canvas" width="600" height="400" style="display:none;"></canvas>
+  <script src="Script.js"></script>
+</body>
+</html>
