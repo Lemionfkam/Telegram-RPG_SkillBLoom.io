@@ -428,3 +428,28 @@ header h1 {
   font-weight: 500;
   font-size: 1.1rem;
 }
+.avatar-wrapper {
+  position: relative;  /* чтобы кнопка позиционировалась внутри */
+}
+#btn-change-avatar {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 229, 255, 0.7);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a0f1e;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: background 0.2s;
+}
+#btn-change-avatar:hover {
+  background: rgba(0, 229, 255, 0.9);
+}
