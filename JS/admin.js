@@ -77,7 +77,6 @@ function openUserDetail(index) {
   const detailHTML = `
     <h3>${profile.name || 'Имя не указано'}</h3>
     <p>Уровень ${profile.level} (${profile.totalXP} XP)</p>
-    <p>Возраст: ${profile.age || '—'}</p>
     <hr style="border-color:rgba(255,255,255,0.1); margin:12px 0;">
     <h4>Активные навыки (${active.length})</h4>
     ${active.map(s => {
@@ -99,7 +98,6 @@ function openUserDetail(index) {
   document.getElementById('modal-user-detail').classList.remove('hidden');
 }
 
-// Загрузка JSON-файлов
 document.getElementById('btn-load-user').addEventListener('click', () => {
   document.getElementById('admin-import-file').click();
 });
@@ -124,7 +122,6 @@ document.getElementById('admin-import-file').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
-// Новая кнопка: загрузить себя из localStorage
 document.getElementById('btn-load-self').addEventListener('click', () => {
   const localData = localStorage.getItem('app_data');
   if (!localData) {
@@ -133,7 +130,6 @@ document.getElementById('btn-load-self').addEventListener('click', () => {
   }
   try {
     const data = JSON.parse(localData);
-    // Проверяем, не добавлен ли уже этот пользователь (по имени, можно добавить более точную проверку)
     const exists = adminUsers.some(u => u.profile?.name === data.profile?.name && u.profile?.totalXP === data.profile?.totalXP);
     if (exists) {
       alert('Этот пользователь уже загружен.');
