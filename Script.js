@@ -226,11 +226,10 @@ function openTasksForSkill(skillId) {
     const xp = xpMap[difficulty];
     skill.tasks.push({ id: generateId(), text, type, difficulty, xp, done: false, doneTimestamp: null });
     document.getElementById('new-task-text').value = '';
-    saveAppData().then(() => {
-      openTasksForSkill(skillId);
-      renderBubbles();
-      renderTaskSkillList();
-    });
+    saveAppData();
+    openTasksForSkill(skillId);
+    renderBubbles();
+    renderTaskSkillList();
   };
 
   document.getElementById('modal-tasks').classList.remove('hidden');
@@ -253,12 +252,11 @@ function completeTask(skill, taskId) {
   appState.profile.totalXP += xp;
   skill.masteryPoints += xp;
   checkLevelUp();
-  saveAppData().then(() => {
-    renderProfile();
-    renderBubbles();
-    renderTaskSkillList();
-    openTasksForSkill(skill.id);
-  });
+  saveAppData();
+  renderProfile();
+  renderBubbles();
+  renderTaskSkillList();
+  openTasksForSkill(skill.id);
 }
 
 function spawnBubbleParticle(bubbleEl) {
@@ -307,14 +305,16 @@ function popSkill(skillId) {
   setTimeout(() => {
     bubble.classList.remove('popping');
     skill.mastered = true;
-    saveAppData().then(renderAll);
+    saveAppData();
+    renderAll();
   }, 600);
 }
 
 function deleteSkill(skillId) {
   if (!confirm('Удалить навык? Задания будут потеряны.')) return;
   appState.skills = appState.skills.filter(s => s.id !== skillId);
-  saveAppData().then(renderAll);
+  saveAppData();
+  renderAll();
 }
 
 // ========== ВКЛАДКИ ==========
@@ -354,7 +354,8 @@ function importData(file) {
       const data = JSON.parse(e.target.result);
       showConfirm('Импорт данных', 'Перезаписать текущие данные?', () => {
         appState = data;
-        saveAppData().then(renderAll);
+        saveAppData();
+        renderAll();
       });
     } catch { alert('Неверный файл'); }
   };
@@ -372,7 +373,8 @@ function showConfirm(title, message, onYes) {
 function resetData() {
   showConfirm('Сброс данных', 'Все данные будут удалены безвозвратно. Продолжить?', () => {
     appState = { profile: { name: '', avatarUrl: null, totalXP: 0, level: 1 }, skills: [] };
-    saveAppData().then(renderAll);
+    saveAppData();
+    renderAll();
   });
 }
 
@@ -401,7 +403,7 @@ function bindEvents() {
   // Имя
   document.getElementById('profile-name').addEventListener('input', (e) => {
     appState.profile.name = e.target.value;
-    updateAvatar(); // обновляем инициал в плейсхолдере
+    updateAvatar();
     saveAppData();
   });
 
@@ -413,7 +415,7 @@ function bindEvents() {
     if (e.target.files[0]) {
       handleAvatarUpload(e.target.files[0]);
     }
-    e.target.value = ''; // сброс, чтобы можно было выбрать тот же файл повторно
+    e.target.value = '';
   });
 
   // Создание навыка
@@ -447,10 +449,9 @@ function bindEvents() {
     appState.skills.push({
       id: generateId(), name, masteryPoints: 0, mastered: false, masteryDays: days, tasks: [], bubbleSize: size
     });
-    saveAppData().then(() => {
-      renderBubbles();
-      document.getElementById('modal-skill').classList.add('hidden');
-    });
+    saveAppData();
+    renderBubbles();
+    document.getElementById('modal-skill').classList.add('hidden');
   });
 
   document.getElementById('btn-export').addEventListener('click', exportData);
