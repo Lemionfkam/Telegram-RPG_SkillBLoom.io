@@ -18,6 +18,83 @@ const generateId = () => Date.now().toString(36) + Math.random().toString(36).su
 const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4';
 const ADMIN_ID = 1099017045;
 const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000;
+// ========== GOOGLE SHEETS API ==========
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzSm6sRoTiCEYvPGn_JFqn_gmOX9CHQqhgEn9h6K1qSiyzLXzJS_e2mVSa4AJvZvxlu/exec';
+
+function getTelegramUserId() {
+  try {
+    if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
+      const user = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (user && user.id) {
+        return String(user.id);
+      }
+    }
+    // Если не в Telegram, можно использовать сохранённый в localStorage ID
+    let localId = localStorage.getItem('telegram_user_id');
+    if (!localId) {
+      // Сгенерируем временный ID для теста (но тогда синхронизация не будет работать)
+      localId = 'local_' + Date.now();
+      localStorage.setItem('telegram_user_id', localId);
+    }
+    return localId;
+  } catch (e) {
+    console.warn('Не удалось получить ID пользователя', e);
+    return null;
+  }
+}
+
+async function loadRemoteData(userId) {
+  try {
+    const url = `${SHEETS_API_URL}?userId=${encodeURIComponent(userId)}`;
+    const resp = await fetch(url);
+    const result = await resp.json();
+    if (result.ok && result.data) {
+      // Применяем полученные данные к appState
+      appState.profile.name = result.data.name || '';
+      appState.profile.level = result.data.level || 1;
+      appState.profile.totalXP = result.data.totalXP || 0;
+      appState.profile.avatarUrl = result.data.avatarUrl || null;
+      appState.skills = result.data.skills || [];
+      // Сохраняем в localStorage
+      saveAppData();
+      renderAll();
+      console.log('✅ Данные загружены с сервера');
+      return true;
+    } else {
+      console.log('ℹ️ На сервере данных для этого пользователя нет');
+      return false;
+    }
+  } catch (e) {
+    console.error('❌ Ошибка загрузки с сервера:', e);
+    return false;
+  }
+}
+
+async function saveRemoteData(userId) {
+  try {
+    const payload = {
+      userId: userId,
+      data: {
+        name: appState.profile.name,
+        level: appState.profile.level,
+        totalXP: appState.profile.totalXP,
+        avatarUrl: appState.profile.avatarUrl,
+        skills: appState.skills
+      }
+    };
+    // Для POST-запросов к Google Apps Script используем mode: 'no-cors',
+    // чтобы обойти CORS-ограничения. При этом ответ мы не получим, но данные сохранятся.
+    await fetch(SHEETS_API_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    console.log('✅ Данные отправлены в Google Таблицу');
+  } catch (e) {
+    console.error('❌ Ошибка сохранения на сервер:', e);
+  }
+}
 
 // ========== ХРАНИЛИЩЕ ==========
 function loadAppData() {
@@ -35,8 +112,13 @@ function loadAppData() {
 }
 
 function saveAppData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-    console.log('💾 Данные сохранены в localStorage');
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+  console.log('💾 Данные сохранены в localStorage');
+  // Отправка на сервер
+  const userId = getTelegramUserId();
+  if (userId) {
+    saveRemoteData(userId);
+  }
 }
 
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -606,6 +688,20 @@ function renderAll() {
 loadAppData();
 bindEvents();
 renderAll();
+
+// ========== ЗАГРУЗКА С УДАЛЁННОГО СЕРВЕРА ==========
+const userId = getTelegramUserId();
+if (userId) {
+  // Загружаем данные с сервера
+  loadRemoteData(userId).then(success => {
+    if (!success) {
+      // Если на сервере ничего нет, но есть локальные данные — сохраним их на сервер
+      if (appState.profile.name) {
+        saveRemoteData(userId);
+      }
+    }
+  });
+}
 
 if (appState.profile.name && !appState.profile.profileSent) {
     console.log('👤 Первый запуск с именем – отправка профиля...');
