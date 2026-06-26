@@ -22,7 +22,7 @@ const ADMIN_ID = 1099017045;
 const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000;
 
 // ========== GOOGLE SHEETS API (ваш URL) ==========
-const SHEETS_API_URL = 'https://script.google.com/macros/s/ВАШ_УНИКАЛЬНЫЙ_ИД/exec'; // ЗАМЕНИТЕ!
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzSm6sRoTiCEYvPGn_JFqn_gmOX9CHQqhgEn9h6K1qSiyzLXzJS_e2mVSa4AJvZvxlu/exec'; // ЗАМЕНИТЕ!
 
 // ========== ХРАНИЛИЩЕ ==========
 function loadAppData() {
