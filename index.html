@@ -13,9 +13,11 @@
     </header>
 
     <main id="main-content">
+      <!-- Статус синхронизации -->
       <div id="sync-status" style="text-align:center; font-size:0.8rem; color:var(--text-secondary); margin:4px 0;">
-        <span id="sync-text">Синхронизация...</span>
+        <span id="sync-text">⏳ Загрузка...</span>
       </div>
+
       <!-- Вкладка Профиль -->
       <section id="tab-profile" class="tab-content active">
         <div class="profile-card glass-panel">
@@ -52,6 +54,7 @@
           <button id="btn-import" class="btn">Импорт</button>
           <input type="file" id="import-file-input" accept=".json" style="display:none;">
           <button id="btn-reset" class="btn btn-danger">Сброс данных</button>
+          <!-- Кнопка синхронизации добавится автоматически через JS -->
         </div>
       </section>
 
@@ -90,7 +93,7 @@
     </nav>
   </div>
 
-  <!-- Модальное окно "Новый навык" -->
+  <!-- Модалки -->
   <div id="modal-skill" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content glass-panel">
@@ -108,7 +111,6 @@
     </div>
   </div>
 
-  <!-- Модальное окно заданий -->
   <div id="modal-tasks" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content glass-panel" style="max-width: 450px;">
@@ -141,7 +143,6 @@
     </div>
   </div>
 
-  <!-- Модальное окно подтверждения -->
   <div id="modal-confirm" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content glass-panel">
@@ -155,6 +156,28 @@
   </div>
 
   <canvas id="share-canvas" width="600" height="400" style="display:none;"></canvas>
+
+  <!-- Firebase SDK (совместимая версия) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+  <script>
+    // Ваш конфиг Firebase (добавлено поле databaseURL)
+    const firebaseConfig = {
+      apiKey: "AIzaSyD10aDO_OiGUcIbB23bp1f5l2hxarSJM3M",
+      authDomain: "skillbloom-sync.firebaseapp.com",
+      databaseURL: "https://skillbloom-sync-default-rtdb.firebaseio.com",
+      projectId: "skillbloom-sync",
+      storageBucket: "skillbloom-sync.firebasestorage.app",
+      messagingSenderId: "384102512050",
+      appId: "1:384102512050:web:b28d823a30630df79120ab"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+  </script>
+
+  <!-- Основной скрипт -->
   <script src="Script.js"></script>
 </body>
 </html>
