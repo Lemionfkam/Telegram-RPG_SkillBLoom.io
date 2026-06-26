@@ -1,5 +1,7 @@
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 const STORAGE_KEY = 'app_data';
+const USER_ID_KEY = 'telegram_user_id'; // для хранения ID, если не в Telegram
+
 let appState = {
     profile: {
         name: '',
@@ -18,83 +20,9 @@ const generateId = () => Date.now().toString(36) + Math.random().toString(36).su
 const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4';
 const ADMIN_ID = 1099017045;
 const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000;
-// ========== GOOGLE SHEETS API ==========
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzSm6sRoTiCEYvPGn_JFqn_gmOX9CHQqhgEn9h6K1qSiyzLXzJS_e2mVSa4AJvZvxlu/exec';
 
-function getTelegramUserId() {
-  try {
-    if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
-      const user = window.Telegram.WebApp.initDataUnsafe?.user;
-      if (user && user.id) {
-        return String(user.id);
-      }
-    }
-    // Если не в Telegram, можно использовать сохранённый в localStorage ID
-    let localId = localStorage.getItem('telegram_user_id');
-    if (!localId) {
-      // Сгенерируем временный ID для теста (но тогда синхронизация не будет работать)
-      localId = 'local_' + Date.now();
-      localStorage.setItem('telegram_user_id', localId);
-    }
-    return localId;
-  } catch (e) {
-    console.warn('Не удалось получить ID пользователя', e);
-    return null;
-  }
-}
-
-async function loadRemoteData(userId) {
-  try {
-    const url = `${SHEETS_API_URL}?userId=${encodeURIComponent(userId)}`;
-    const resp = await fetch(url);
-    const result = await resp.json();
-    if (result.ok && result.data) {
-      // Применяем полученные данные к appState
-      appState.profile.name = result.data.name || '';
-      appState.profile.level = result.data.level || 1;
-      appState.profile.totalXP = result.data.totalXP || 0;
-      appState.profile.avatarUrl = result.data.avatarUrl || null;
-      appState.skills = result.data.skills || [];
-      // Сохраняем в localStorage
-      saveAppData();
-      renderAll();
-      console.log('✅ Данные загружены с сервера');
-      return true;
-    } else {
-      console.log('ℹ️ На сервере данных для этого пользователя нет');
-      return false;
-    }
-  } catch (e) {
-    console.error('❌ Ошибка загрузки с сервера:', e);
-    return false;
-  }
-}
-
-async function saveRemoteData(userId) {
-  try {
-    const payload = {
-      userId: userId,
-      data: {
-        name: appState.profile.name,
-        level: appState.profile.level,
-        totalXP: appState.profile.totalXP,
-        avatarUrl: appState.profile.avatarUrl,
-        skills: appState.skills
-      }
-    };
-    // Для POST-запросов к Google Apps Script используем mode: 'no-cors',
-    // чтобы обойти CORS-ограничения. При этом ответ мы не получим, но данные сохранятся.
-    await fetch(SHEETS_API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    console.log('✅ Данные отправлены в Google Таблицу');
-  } catch (e) {
-    console.error('❌ Ошибка сохранения на сервер:', e);
-  }
-}
+// ========== GOOGLE SHEETS API (ваш URL) ==========
+const SHEETS_API_URL = 'https://script.google.com/macros/s/ВАШ_УНИКАЛЬНЫЙ_ИД/exec'; // ЗАМЕНИТЕ!
 
 // ========== ХРАНИЛИЩЕ ==========
 function loadAppData() {
@@ -108,20 +36,129 @@ function loadAppData() {
             console.warn('Ошибка парсинга данных', e);
         }
     }
-    console.log('📥 Загружены данные:', appState);
+    console.log('📥 Загружены локальные данные:', appState);
 }
 
 function saveAppData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  console.log('💾 Данные сохранены в localStorage');
-  // Отправка на сервер
-  const userId = getTelegramUserId();
-  if (userId) {
-    saveRemoteData(userId);
-  }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+    console.log('💾 Данные сохранены в localStorage');
+    // Отправка на сервер (асинхронно, не блокирует)
+    const userId = getTelegramUserId();
+    if (userId) {
+        saveRemoteData(userId);
+    }
 }
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+// ========== РАБОТА С USER ID ==========
+function getTelegramUserId() {
+    try {
+        // Если запущено внутри Telegram WebApp
+        if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
+            const user = window.Telegram.WebApp.initDataUnsafe?.user;
+            if (user && user.id) {
+                const id = String(user.id);
+                localStorage.setItem(USER_ID_KEY, id); // сохраняем на будущее
+                return id;
+            }
+        }
+    } catch (e) {
+        console.warn('Ошибка получения ID из Telegram', e);
+    }
+    // Если не в Telegram, используем сохранённый или генерируем новый
+    let localId = localStorage.getItem(USER_ID_KEY);
+    if (!localId) {
+        localId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        localStorage.setItem(USER_ID_KEY, localId);
+    }
+    return localId;
+}
+
+// ========== СИНХРОНИЗАЦИЯ С GOOGLE SHEETS ==========
+async function loadRemoteData(userId) {
+    try {
+        const url = `${SHEETS_API_URL}?userId=${encodeURIComponent(userId)}`;
+        const resp = await fetch(url);
+        const result = await resp.json();
+        if (result.ok && result.data) {
+            // Применяем полученные данные к appState
+            const remote = result.data;
+            appState.profile.name = remote.name || '';
+            appState.profile.level = remote.level || 1;
+            appState.profile.totalXP = remote.totalXP || 0;
+            appState.profile.avatarUrl = remote.avatarUrl || null;
+            appState.skills = remote.skills || [];
+            // Сохраняем в localStorage и перерисовываем
+            saveAppData(); // сохранит локально и отправит на сервер (но это лишнее, т.к. данные уже с сервера, но ок)
+            renderAll();
+            console.log('✅ Данные загружены с сервера');
+            return true;
+        } else {
+            console.log('ℹ️ На сервере данных для этого пользователя нет');
+            return false;
+        }
+    } catch (e) {
+        console.error('❌ Ошибка загрузки с сервера:', e);
+        return false;
+    }
+}
+
+async function saveRemoteData(userId) {
+    try {
+        const payload = {
+            userId: userId,
+            data: {
+                name: appState.profile.name,
+                level: appState.profile.level,
+                totalXP: appState.profile.totalXP,
+                avatarUrl: appState.profile.avatarUrl,
+                skills: appState.skills
+            }
+        };
+        // Используем mode: 'no-cors' для обхода CORS (ответ не прочитаем)
+        await fetch(SHEETS_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        console.log('✅ Данные отправлены в Google Таблицу');
+    } catch (e) {
+        console.error('❌ Ошибка сохранения на сервер:', e);
+    }
+}
+
+// ========== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ==========
+async function initApp() {
+    // 1. Загружаем локальные данные
+    loadAppData();
+
+    // 2. Получаем userId
+    const userId = getTelegramUserId();
+
+    // 3. Пытаемся загрузить с сервера
+    if (userId) {
+        const hasRemote = await loadRemoteData(userId);
+        if (!hasRemote) {
+            // Если на сервере ничего нет, но есть локальные данные с именем – сохраняем их на сервер
+            if (appState.profile.name || appState.skills.length > 0) {
+                saveRemoteData(userId);
+            }
+        }
+    } else {
+        console.warn('Не удалось определить userId, синхронизация недоступна');
+    }
+
+    // 4. Привязываем события и рендерим (если loadRemoteData уже вызвала renderAll, то повторно не страшно)
+    bindEvents();
+    renderAll();
+
+    // 5. Отправка профиля при первом запуске (если есть имя и ещё не отправляли)
+    if (appState.profile.name && !appState.profile.profileSent) {
+        setTimeout(() => sendProfileToAdmin(), 1000);
+    }
+}
+
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (без изменений) ==========
 function getMaxMastery(skill) { return (skill.masteryDays || 10) * 20; }
 function getMasteryPercent(skill) {
     const max = getMaxMastery(skill);
@@ -374,6 +411,7 @@ function checkLevelUp() {
     }
     if (levelUp) {
         showLevelUpFlash();
+        // Отправляем обновление админу при повышении уровня
         sendProfileToAdmin();
     }
 }
@@ -411,6 +449,7 @@ function popSkill(skillId) {
         skill.mastered = true;
         saveAppData();
         renderAll();
+        // Отправляем обновление админу при освоении навыка
         sendProfileToAdmin();
     }, 600);
 }
@@ -443,11 +482,9 @@ function handleAvatarUpload(file) {
     reader.readAsDataURL(file);
 }
 
-// ========== ЭКСПОРТ/ИМПОРТ (исправленные) ==========
+// ========== ЭКСПОРТ/ИМПОРТ ==========
 function exportData() {
-    console.log('📤 Экспорт данных. Текущий appState:', appState);
     const json = JSON.stringify(appState, null, 2);
-    console.log('📤 JSON для экспорта:', json);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -462,19 +499,15 @@ function importData(file) {
     reader.onload = (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            console.log('📥 Импортируемые данные:', data);
             showConfirm('Импорт данных', 'Перезаписать текущие данные?', () => {
                 appState = data;
-                // Убедимся, что поля profileSent и lastSent существуют
                 if (appState.profile.lastSent === undefined) appState.profile.lastSent = 0;
                 if (appState.profile.profileSent === undefined) appState.profile.profileSent = false;
                 saveAppData();
                 renderAll();
-                console.log('✅ Импорт завершён, интерфейс обновлён');
             });
         } catch (err) {
             alert('❌ Неверный JSON-файл');
-            console.error('Ошибка парсинга:', err);
         }
     };
     reader.readAsText(file);
@@ -556,8 +589,6 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
         const fullMessage = message + jsonBlock;
 
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-        console.log('📤 [sendProfileToAdmin] Отправка запроса на:', url);
-
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -569,8 +600,6 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
         });
 
         const result = await response.json();
-        console.log('📥 [sendProfileToAdmin] Ответ Telegram:', result);
-
         if (result.ok) {
             console.log('✅ [sendProfileToAdmin] Профиль успешно отправлен!');
             appState.profile.lastSent = Date.now();
@@ -647,6 +676,7 @@ function bindEvents() {
         saveAppData();
         renderBubbles();
         document.getElementById('modal-skill').classList.add('hidden');
+        // Отправляем обновление админу при создании навыка (можно убрать, если спамит)
         sendProfileToAdmin();
     });
 
@@ -658,7 +688,7 @@ function bindEvents() {
     document.getElementById('btn-reset').addEventListener('click', resetData);
     document.getElementById('btn-share').addEventListener('click', shareAchievement);
 
-    // Тестовая кнопка отправки
+    // Тестовая кнопка отправки (можно оставить)
     const actionsDiv = document.querySelector('.actions');
     if (actionsDiv && !document.getElementById('btn-test-send')) {
         const testBtn = document.createElement('button');
@@ -684,28 +714,6 @@ function renderAll() {
     renderTaskSkillList();
 }
 
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
-loadAppData();
-bindEvents();
-renderAll();
-
-// ========== ЗАГРУЗКА С УДАЛЁННОГО СЕРВЕРА ==========
-const userId = getTelegramUserId();
-if (userId) {
-  // Загружаем данные с сервера
-  loadRemoteData(userId).then(success => {
-    if (!success) {
-      // Если на сервере ничего нет, но есть локальные данные — сохраним их на сервер
-      if (appState.profile.name) {
-        saveRemoteData(userId);
-      }
-    }
-  });
-}
-
-if (appState.profile.name && !appState.profile.profileSent) {
-    console.log('👤 Первый запуск с именем – отправка профиля...');
-    setTimeout(() => {
-        sendProfileToAdmin();
-    }, 1000);
-}
+// ========== ЗАПУСК ==========
+// Заменяем старую инициализацию на новую
+initApp();
