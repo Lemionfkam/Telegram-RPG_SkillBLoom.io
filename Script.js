@@ -328,76 +328,89 @@ function startGlobalTimer() {
 
 // ========== ЗАДАНИЯ ==========
 function openTasksForSkill(skillId) {
-    alert('openTasksForSkill вызван, id: ' + skillId);
-    console.log('openTasksForSkill вызван, skillId:', skillId);
-    if (!skillId) {
-        alert('нет skillId');
-        return;
-    }
-    const skill = appState.skills.find(s => s.id === skillId);
-    if (!skill) {
-        alert('навык не найден');
-        return;
-    }
-    resetTimedDailyTasks(skill);
-    const max = getMaxMastery(skill);
-    document.getElementById('task-skill-title').textContent = skill.name;
-    document.getElementById('task-mastery-text').textContent = `Мастерство: ${skill.masteryPoints} / ${max} XP`;
-    document.getElementById('task-mastery-fill').style.width = `${getMasteryPercent(skill)}%`;
+    try {
+        alert('openTasksForSkill START, id: ' + skillId);
+        if (!skillId) {
+            alert('нет skillId');
+            return;
+        }
+        const skill = appState.skills.find(s => s.id === skillId);
+        if (!skill) {
+            alert('навык не найден');
+            return;
+        }
+        alert('Навык найден: ' + skill.name);
+        resetTimedDailyTasks(skill);
+        const max = getMaxMastery(skill);
+        alert('max XP = ' + max);
+        document.getElementById('task-skill-title').textContent = skill.name;
+        document.getElementById('task-mastery-text').textContent = `Мастерство: ${skill.masteryPoints} / ${max} XP`;
+        document.getElementById('task-mastery-fill').style.width = `${getMasteryPercent(skill)}%`;
+        alert('Заголовок обновлён');
 
-    const now = Date.now();
-    const taskListEl = document.getElementById('task-list');
-    taskListEl.innerHTML = skill.tasks.map(task => {
-        let disabled = false;
-        let cooldownHTML = '';
-        if (task.done) {
-            if (task.type === 'single') disabled = true;
-            else if (task.type === 'daily') {
-                const remaining = task.doneTimestamp + COOLDOWN_MS - now;
-                if (remaining > 0) {
-                    disabled = true;
-                    const h = Math.floor(remaining / 3600000);
-                    const m = Math.floor((remaining % 3600000) / 60000);
-                    const s = Math.floor((remaining % 60000) / 1000);
-                    cooldownHTML = `<span class="cooldown-timer" data-expire="${task.doneTimestamp + COOLDOWN_MS}">${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}</span>`;
-                } else {
-                    task.done = false;
-                    task.doneTimestamp = null;
+        const now = Date.now();
+        const taskListEl = document.getElementById('task-list');
+        if (!taskListEl) {
+            alert('task-list не найден');
+            return;
+        }
+        taskListEl.innerHTML = skill.tasks.map(task => {
+            let disabled = false;
+            let cooldownHTML = '';
+            if (task.done) {
+                if (task.type === 'single') disabled = true;
+                else if (task.type === 'daily') {
+                    const remaining = task.doneTimestamp + COOLDOWN_MS - now;
+                    if (remaining > 0) {
+                        disabled = true;
+                        const h = Math.floor(remaining / 3600000);
+                        const m = Math.floor((remaining % 3600000) / 60000);
+                        const s = Math.floor((remaining % 60000) / 1000);
+                        cooldownHTML = `<span class="cooldown-timer" data-expire="${task.doneTimestamp + COOLDOWN_MS}">${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}</span>`;
+                    } else {
+                        task.done = false;
+                        task.doneTimestamp = null;
+                    }
                 }
             }
+            return `
+                <li class="task-item ${task.done ? 'done' : ''}" data-task-id="${task.id}">
+                    <input type="checkbox" ${task.done ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+                    <span class="task-text">${task.text} (${task.xp} XP, ${task.type})</span>
+                    ${cooldownHTML}
+                </li>
+            `;
+        }).join('');
+        alert('Список заданий отрендерен');
+
+        document.getElementById('btn-add-task').onclick = () => {
+            const text = document.getElementById('new-task-text').value.trim();
+            if (!text) return;
+            const type = document.getElementById('task-type-select').value;
+            const difficulty = document.getElementById('task-difficulty-select').value;
+            const xpMap = { easy: 5, medium: 10, hard: 20 };
+            const xp = xpMap[difficulty];
+            skill.tasks.push({ id: generateId(), text, type, difficulty, xp, done: false, doneTimestamp: null });
+            document.getElementById('new-task-text').value = '';
+            saveAppData();
+            openTasksForSkill(skillId);
+            renderBubbles();
+            renderTaskSkillList();
+        };
+
+        const modal = document.getElementById('modal-tasks');
+        if (modal) {
+            modal.classList.remove('hidden');
+            alert('модалка открыта');
+        } else {
+            alert('modal-tasks не найден');
         }
-        return `
-            <li class="task-item ${task.done ? 'done' : ''}" data-task-id="${task.id}">
-                <input type="checkbox" ${task.done ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
-                <span class="task-text">${task.text} (${task.xp} XP, ${task.type})</span>
-                ${cooldownHTML}
-            </li>
-        `;
-    }).join('');
-
-    document.getElementById('btn-add-task').onclick = () => {
-        const text = document.getElementById('new-task-text').value.trim();
-        if (!text) return;
-        const type = document.getElementById('task-type-select').value;
-        const difficulty = document.getElementById('task-difficulty-select').value;
-        const xpMap = { easy: 5, medium: 10, hard: 20 };
-        const xp = xpMap[difficulty];
-        skill.tasks.push({ id: generateId(), text, type, difficulty, xp, done: false, doneTimestamp: null });
-        document.getElementById('new-task-text').value = '';
-        saveAppData();
-        openTasksForSkill(skillId);
-        renderBubbles();
-        renderTaskSkillList();
-    };
-
-    const modal = document.getElementById('modal-tasks');
-    if (modal) {
-        modal.classList.remove('hidden');
-        alert('модалка открыта');
-    } else {
-        alert('modal-tasks не найден');
+        startGlobalTimer();
+        alert('openTasksForSkill завершён успешно');
+    } catch (e) {
+        alert('Ошибка в openTasksForSkill: ' + e.message);
+        console.error(e);
     }
-    startGlobalTimer();
 }
 
 function completeTask(skill, taskId) {
@@ -740,14 +753,15 @@ function bindEvents() {
     document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
 
     // ========== ДЕЛЕГИРОВАНИЕ НА document ==========
-    // Для пузырьков используем и click, и touchstart
     function handleBubbleClick(e) {
         const bubble = e.target.closest('.skill-bubble');
         if (bubble) {
             const skillId = bubble.dataset.skillId;
             if (skillId) {
                 alert('Клик по пузырьку, id: ' + skillId);
+                alert('Вызываем openTasksForSkill...');
                 openTasksForSkill(skillId);
+                alert('openTasksForSkill завершён');
                 switchTab('tasks');
                 e.preventDefault();
             }
@@ -756,7 +770,6 @@ function bindEvents() {
     document.addEventListener('click', handleBubbleClick);
     document.addEventListener('touchstart', handleBubbleClick, { passive: false });
 
-    // Карточки навыков в списке заданий
     function handleTaskCardClick(e) {
         const card = e.target.closest('.task-skill-card');
         if (card) {
@@ -771,7 +784,6 @@ function bindEvents() {
     document.addEventListener('click', handleTaskCardClick);
     document.addEventListener('touchstart', handleTaskCardClick, { passive: false });
 
-    // Кнопка "Лопнуть"
     function handlePopClick(e) {
         const popBtn = e.target.closest('.pop-btn');
         if (popBtn) {
@@ -789,7 +801,6 @@ function bindEvents() {
     document.addEventListener('click', handlePopClick);
     document.addEventListener('touchstart', handlePopClick, { passive: false });
 
-    // Кнопка удаления навыка
     function handleDeleteClick(e) {
         const delBtn = e.target.closest('.delete-skill-btn');
         if (delBtn) {
@@ -825,7 +836,6 @@ function bindEvents() {
         }
     });
 
-    // Сброс таймеров
     appState.skills.forEach(skill => resetTimedDailyTasks(skill));
 }
 
