@@ -83,11 +83,14 @@ async function loadRemoteData(userId) {
             appState.profile.level = remoteData.level || 1;
             appState.profile.totalXP = remoteData.totalXP || 0;
             appState.profile.avatarUrl = remoteData.avatarUrl || null;
-            // Убедимся, что у каждого навыка есть поле tasks
-            appState.skills = (remoteData.skills || []).map(skill => {
+            appState.skills = remoteData.skills || [];
+            
+            // *** ФИКС: проверяем, что у всех навыков есть tasks ***
+            appState.skills = appState.skills.map(skill => {
                 if (!skill.tasks) skill.tasks = [];
                 return skill;
             });
+            
             localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
             renderAll();
             updateSyncStatus('✅ Синхронизировано');
@@ -138,11 +141,15 @@ function subscribeToRemoteUpdates(userId) {
                 level: remoteData.level || 1,
                 totalXP: remoteData.totalXP || 0,
                 avatarUrl: remoteData.avatarUrl || null,
-                skills: (remoteData.skills || []).map(skill => {
-                    if (!skill.tasks) skill.tasks = [];
-                    return skill;
-                })
+                skills: remoteData.skills || []
             };
+            
+            // *** ФИКС: проверяем, что у всех навыков есть tasks ***
+            newData.skills = newData.skills.map(skill => {
+                if (!skill.tasks) skill.tasks = [];
+                return skill;
+            });
+            
             const currentData = {
                 name: appState.profile.name,
                 level: appState.profile.level,
@@ -304,7 +311,6 @@ function renderTaskSkillList() {
 const COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 function resetTimedDailyTasks(skill) {
-    if (!skill.tasks) skill.tasks = [];
     const now = Date.now();
     skill.tasks.forEach(t => {
         if (t.type === 'daily' && t.done && t.doneTimestamp && (now - t.doneTimestamp >= COOLDOWN_MS)) {
@@ -339,17 +345,22 @@ function openTasksForSkill(skillId) {
     try {
         console.log('openTasksForSkill START, id:', skillId);
         if (!skillId) {
-            alert('нет skillId');
+            console.warn('нет skillId');
             return;
         }
         const skill = appState.skills.find(s => String(s.id) === String(skillId));
         if (!skill) {
-            alert('навык не найден! Ищем id: ' + skillId + ', но в skills есть только: ' + appState.skills.map(s => s.id).join(', '));
+            console.warn('навык не найден! Ищем id:', skillId, 'в:', appState.skills.map(s => s.id));
             return;
         }
-        // Гарантируем наличие поля tasks
-        if (!skill.tasks) skill.tasks = [];
         console.log('Навык найден:', skill.name);
+        
+        // *** ФИКС: если нет tasks, создаём пустой массив ***
+        if (!skill.tasks) {
+            console.warn('У навыка нет tasks, создаём пустой массив');
+            skill.tasks = [];
+        }
+        
         resetTimedDailyTasks(skill);
         const max = getMaxMastery(skill);
         document.getElementById('task-skill-title').textContent = skill.name;
@@ -359,7 +370,7 @@ function openTasksForSkill(skillId) {
         const now = Date.now();
         const taskListEl = document.getElementById('task-list');
         if (!taskListEl) {
-            alert('task-list не найден');
+            console.error('task-list не найден');
             return;
         }
         taskListEl.innerHTML = skill.tasks.map(task => {
@@ -410,12 +421,12 @@ function openTasksForSkill(skillId) {
             modal.classList.remove('hidden');
             console.log('Модалка открыта');
         } else {
-            alert('modal-tasks не найден');
+            console.error('modal-tasks не найден');
         }
         startGlobalTimer();
     } catch (e) {
+        console.error('Ошибка:', e);
         alert('Ошибка: ' + e.message);
-        console.error(e);
     }
 }
 
@@ -657,17 +668,14 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
 
 // ========== ПРИВЯЗКА СОБЫТИЙ ==========
 function bindEvents() {
-    // Навигация
     document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
-    // Имя
     document.getElementById('profile-name').addEventListener('input', (e) => {
         appState.profile.name = e.target.value;
         updateAvatar();
         saveAppData();
     });
 
-    // Аватар
     document.getElementById('btn-change-avatar').addEventListener('click', () => {
         document.getElementById('avatar-file-input').click();
     });
@@ -678,7 +686,6 @@ function bindEvents() {
         e.target.value = '';
     });
 
-    // Добавить навык
     document.getElementById('btn-add-skill').addEventListener('click', () => {
         document.getElementById('modal-skill').classList.remove('hidden');
         document.getElementById('skill-name-input').value = '';
@@ -722,7 +729,6 @@ function bindEvents() {
         sendProfileToAdmin();
     });
 
-    // Экспорт/импорт/сброс
     document.getElementById('btn-export').addEventListener('click', exportData);
     document.getElementById('btn-import').addEventListener('click', () => document.getElementById('import-file-input').click());
     document.getElementById('import-file-input').addEventListener('change', (e) => {
@@ -731,7 +737,6 @@ function bindEvents() {
     document.getElementById('btn-reset').addEventListener('click', resetData);
     document.getElementById('btn-share').addEventListener('click', shareAchievement);
 
-    // Кнопка синхронизации
     const actionsDiv = document.querySelector('.actions');
     if (actionsDiv) {
         const syncBtn = document.createElement('button');
@@ -753,12 +758,11 @@ function bindEvents() {
         });
     }
 
-    // Закрытие модалок
     document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.add('hidden')));
     document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
 
     // ========== ДЕЛЕГИРОВАНИЕ НА document ==========
-    function handleBubbleClick(e) {
+    document.addEventListener('click', function(e) {
         const bubble = e.target.closest('.skill-bubble');
         if (bubble) {
             const skillId = bubble.dataset.skillId;
@@ -769,11 +773,9 @@ function bindEvents() {
                 e.preventDefault();
             }
         }
-    }
-    document.addEventListener('click', handleBubbleClick);
-    document.addEventListener('touchstart', handleBubbleClick, { passive: false });
+    });
 
-    function handleTaskCardClick(e) {
+    document.addEventListener('click', function(e) {
         const card = e.target.closest('.task-skill-card');
         if (card) {
             const skillId = card.dataset.skillId;
@@ -783,11 +785,9 @@ function bindEvents() {
                 e.preventDefault();
             }
         }
-    }
-    document.addEventListener('click', handleTaskCardClick);
-    document.addEventListener('touchstart', handleTaskCardClick, { passive: false });
+    });
 
-    function handlePopClick(e) {
+    document.addEventListener('click', function(e) {
         const popBtn = e.target.closest('.pop-btn');
         if (popBtn) {
             const wrapper = popBtn.closest('.bubble-wrapper');
@@ -800,11 +800,9 @@ function bindEvents() {
                 }
             }
         }
-    }
-    document.addEventListener('click', handlePopClick);
-    document.addEventListener('touchstart', handlePopClick, { passive: false });
+    });
 
-    function handleDeleteClick(e) {
+    document.addEventListener('click', function(e) {
         const delBtn = e.target.closest('.delete-skill-btn');
         if (delBtn) {
             const bubble = delBtn.closest('.skill-bubble');
@@ -817,11 +815,8 @@ function bindEvents() {
                 }
             }
         }
-    }
-    document.addEventListener('click', handleDeleteClick);
-    document.addEventListener('touchstart', handleDeleteClick, { passive: false });
+    });
 
-    // Чекбоксы заданий
     document.addEventListener('change', (e) => {
         const checkbox = e.target.closest('input[type="checkbox"]');
         if (checkbox && !checkbox.disabled) {
