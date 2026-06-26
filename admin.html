@@ -11,23 +11,24 @@
     <header class="glass-panel">
       <h1>Админ-панель</h1>
     </header>
+
     <main id="main-content">
       <section class="tab-content active">
         <div class="admin-panel glass-panel">
-          <h2>Загруженные пользователи</h2>
           <div class="admin-actions">
-            <button id="btn-load-user" class="btn btn-accent">Загрузить JSON пользователя</button>
-            <button id="btn-load-self" class="btn btn-accent">Загрузить себя</button>
-            <input type="file" id="admin-import-file" accept=".json" multiple style="display:none;">
+            <button id="btn-refresh" class="btn btn-accent">🔄 Обновить список</button>
+            <button id="btn-load-self" class="btn btn-accent">📥 Загрузить себя</button>
+            <span id="user-count" style="color:var(--text-secondary); margin-left:auto;"></span>
           </div>
           <div id="users-list" class="users-list">
-            <p class="muted">Нет загруженных пользователей</p>
+            <p class="muted">Загрузка...</p>
           </div>
         </div>
       </section>
     </main>
   </div>
 
+  <!-- Модалка деталей пользователя -->
   <div id="modal-user-detail" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content glass-panel" style="max-width: 450px; max-height: 80vh; overflow-y: auto;">
@@ -37,6 +38,24 @@
       </div>
     </div>
   </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD10aDO_OiGUcIbB23bp1f5l2hxarSJM3M",
+      authDomain: "skillbloom-sync.firebaseapp.com",
+      databaseURL: "https://skillbloom-sync-default-rtdb.firebaseio.com",
+      projectId: "skillbloom-sync",
+      storageBucket: "skillbloom-sync.firebasestorage.app",
+      messagingSenderId: "384102512050",
+      appId: "1:384102512050:web:b28d823a30630df79120ab"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+  </script>
 
   <script src="JS/admin.js"></script>
 </body>
