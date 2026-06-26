@@ -328,14 +328,15 @@ function startGlobalTimer() {
 
 // ========== ЗАДАНИЯ ==========
 function openTasksForSkill(skillId) {
+    alert('openTasksForSkill вызван, id: ' + skillId);
     console.log('openTasksForSkill вызван, skillId:', skillId);
     if (!skillId) {
-        console.warn('Нет skillId');
+        alert('нет skillId');
         return;
     }
     const skill = appState.skills.find(s => s.id === skillId);
     if (!skill) {
-        console.error('Навык не найден!');
+        alert('навык не найден');
         return;
     }
     resetTimedDailyTasks(skill);
@@ -374,10 +375,6 @@ function openTasksForSkill(skillId) {
         `;
     }).join('');
 
-    // Обработчики для чекбоксов – динамически, но через делегирование на taskList
-    // Убираем старые, повесим один раз на весь список
-    // Но проще использовать делегирование, которое уже есть в bindEvents
-
     document.getElementById('btn-add-task').onclick = () => {
         const text = document.getElementById('new-task-text').value.trim();
         if (!text) return;
@@ -393,13 +390,12 @@ function openTasksForSkill(skillId) {
         renderTaskSkillList();
     };
 
-    // Показываем модалку
     const modal = document.getElementById('modal-tasks');
     if (modal) {
         modal.classList.remove('hidden');
-        console.log('Модалка задач открыта');
+        alert('модалка открыта');
     } else {
-        console.error('modal-tasks не найден');
+        alert('modal-tasks не найден');
     }
     startGlobalTimer();
 }
@@ -455,7 +451,7 @@ function showLevelUpFlash() {
 
 // ========== ЛОПАНИЕ ==========
 function popSkill(skillId) {
-    console.log('popSkill вызван, skillId:', skillId);
+    alert('popSkill вызван, id: ' + skillId);
     const skill = appState.skills.find(s => s.id === skillId);
     if (!skill || skill.mastered || getMasteryPercent(skill) < 100) return;
     const bubble = document.querySelector(`.skill-bubble[data-skill-id="${skillId}"]`);
@@ -486,7 +482,7 @@ function popSkill(skillId) {
 }
 
 function deleteSkill(skillId) {
-    console.log('deleteSkill вызван, skillId:', skillId);
+    alert('deleteSkill вызван, id: ' + skillId);
     if (!confirm('Удалить навык? Задания будут потеряны.')) return;
     appState.skills = appState.skills.filter(s => s.id !== skillId);
     saveAppData();
@@ -641,7 +637,7 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
     }
 }
 
-// ========== ПРИВЯЗКА СОБЫТИЙ (ДЕЛЕГИРОВАНИЕ НА DOCUMENT) ==========
+// ========== ПРИВЯЗКА СОБЫТИЙ ==========
 function bindEvents() {
     // Навигация
     document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
@@ -743,67 +739,75 @@ function bindEvents() {
     document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.add('hidden')));
     document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
 
-    // ========== ДЕЛЕГИРОВАНИЕ СОБЫТИЙ НА DOCUMENT ==========
-    // Клик по пузырьку (открыть задания)
-    document.addEventListener('click', (e) => {
+    // ========== ДЕЛЕГИРОВАНИЕ НА document ==========
+    // Для пузырьков используем и click, и touchstart
+    function handleBubbleClick(e) {
         const bubble = e.target.closest('.skill-bubble');
         if (bubble) {
             const skillId = bubble.dataset.skillId;
             if (skillId) {
-                console.log('Клик по пузырьку, id:', skillId);
+                alert('Клик по пузырьку, id: ' + skillId);
                 openTasksForSkill(skillId);
                 switchTab('tasks');
                 e.preventDefault();
             }
         }
-    });
+    }
+    document.addEventListener('click', handleBubbleClick);
+    document.addEventListener('touchstart', handleBubbleClick, { passive: false });
 
-    // Клик по карточке навыка в списке заданий
-    document.addEventListener('click', (e) => {
+    // Карточки навыков в списке заданий
+    function handleTaskCardClick(e) {
         const card = e.target.closest('.task-skill-card');
         if (card) {
             const skillId = card.dataset.skillId;
             if (skillId) {
-                console.log('Клик по карточке навыка, id:', skillId);
+                alert('Клик по карточке, id: ' + skillId);
                 openTasksForSkill(skillId);
                 e.preventDefault();
             }
         }
-    });
+    }
+    document.addEventListener('click', handleTaskCardClick);
+    document.addEventListener('touchstart', handleTaskCardClick, { passive: false });
 
-    // Клик по кнопке "Лопнуть"
-    document.addEventListener('click', (e) => {
+    // Кнопка "Лопнуть"
+    function handlePopClick(e) {
         const popBtn = e.target.closest('.pop-btn');
         if (popBtn) {
             const wrapper = popBtn.closest('.bubble-wrapper');
             if (wrapper) {
                 const skillId = wrapper.dataset.skillId;
                 if (skillId) {
-                    console.log('Клик по "Лопнуть", id:', skillId);
+                    alert('Клик по "Лопнуть", id: ' + skillId);
                     popSkill(skillId);
                     e.preventDefault();
                 }
             }
         }
-    });
+    }
+    document.addEventListener('click', handlePopClick);
+    document.addEventListener('touchstart', handlePopClick, { passive: false });
 
-    // Клик по кнопке удаления навыка
-    document.addEventListener('click', (e) => {
+    // Кнопка удаления навыка
+    function handleDeleteClick(e) {
         const delBtn = e.target.closest('.delete-skill-btn');
         if (delBtn) {
             const bubble = delBtn.closest('.skill-bubble');
             if (bubble) {
                 const skillId = bubble.dataset.skillId;
                 if (skillId) {
-                    console.log('Клик по удалению навыка, id:', skillId);
+                    alert('Клик по удалению, id: ' + skillId);
                     deleteSkill(skillId);
                     e.preventDefault();
                 }
             }
         }
-    });
+    }
+    document.addEventListener('click', handleDeleteClick);
+    document.addEventListener('touchstart', handleDeleteClick, { passive: false });
 
-    // Клик по чекбоксу задания (делегирование)
+    // Чекбоксы заданий
     document.addEventListener('change', (e) => {
         const checkbox = e.target.closest('input[type="checkbox"]');
         if (checkbox && !checkbox.disabled) {
@@ -811,20 +815,17 @@ function bindEvents() {
             if (taskItem) {
                 const taskId = taskItem.dataset.taskId;
                 if (taskId) {
-                    // Находим текущий навык (он должен быть открыт в модалке)
                     const skillTitle = document.getElementById('task-skill-title').textContent;
                     const skill = appState.skills.find(s => s.name === skillTitle);
                     if (skill) {
                         completeTask(skill, taskId);
-                    } else {
-                        console.warn('Не найден навык для выполнения задания');
                     }
                 }
             }
         }
     });
 
-    // Сброс таймеров при загрузке
+    // Сброс таймеров
     appState.skills.forEach(skill => resetTimedDailyTasks(skill));
 }
 
