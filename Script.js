@@ -1,6 +1,6 @@
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 const STORAGE_KEY = 'app_data';
-const USER_ID_KEY = 'telegram_user_id'; // для хранения ID, если не в Telegram
+const USER_ID_KEY = 'telegram_user_id';
 
 let appState = {
     profile: {
@@ -21,9 +21,6 @@ const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4';
 const ADMIN_ID = 1099017045;
 const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000;
 
-// ========== GOOGLE SHEETS API (ваш URL) ==========
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbxqYCFb8p9V3Ty5h54pkZzRL1_jJacjoqVPSJidLiE_6LSmqT_6z5hQux6bJBGx0cls/exec'; // ЗАМЕНИТЕ!
-
 // ========== ХРАНИЛИЩЕ ==========
 function loadAppData() {
     const localData = localStorage.getItem(STORAGE_KEY);
@@ -36,13 +33,12 @@ function loadAppData() {
             console.warn('Ошибка парсинга данных', e);
         }
     }
-    console.log('📥 Загружены локальные данные:', appState);
+    console.log('📥 Локальные данные:', appState);
 }
 
 function saveAppData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-    console.log('💾 Данные сохранены в localStorage');
-    // Отправка на сервер (асинхронно, не блокирует)
+    console.log('💾 Локально сохранено');
     const userId = getTelegramUserId();
     if (userId) {
         saveRemoteData(userId);
@@ -52,113 +48,114 @@ function saveAppData() {
 // ========== РАБОТА С USER ID ==========
 function getTelegramUserId() {
     try {
-        // Если запущено внутри Telegram WebApp
         if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
             const user = window.Telegram.WebApp.initDataUnsafe?.user;
             if (user && user.id) {
                 const id = String(user.id);
-                localStorage.setItem(USER_ID_KEY, id); // сохраняем на будущее
+                localStorage.setItem(USER_ID_KEY, id);
                 return id;
             }
         }
     } catch (e) {
         console.warn('Ошибка получения ID из Telegram', e);
     }
-    // Если не в Telegram, используем сохранённый или генерируем новый
     let localId = localStorage.getItem(USER_ID_KEY);
     if (!localId) {
         localId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         localStorage.setItem(USER_ID_KEY, localId);
+        console.log('🆕 Сгенерирован локальный userId:', localId);
     }
     return localId;
 }
 
-// ========== СИНХРОНИЗАЦИЯ С GOOGLE SHEETS ==========
+// ========== СИНХРОНИЗАЦИЯ С FIREBASE ==========
 async function loadRemoteData(userId) {
     try {
-        const url = `${SHEETS_API_URL}?userId=${encodeURIComponent(userId)}`;
-        const resp = await fetch(url);
-        const result = await resp.json();
-        if (result.ok && result.data) {
-            // Применяем полученные данные к appState
-            const remote = result.data;
-            appState.profile.name = remote.name || '';
-            appState.profile.level = remote.level || 1;
-            appState.profile.totalXP = remote.totalXP || 0;
-            appState.profile.avatarUrl = remote.avatarUrl || null;
-            appState.skills = remote.skills || [];
-            // Сохраняем в localStorage и перерисовываем
-            saveAppData(); // сохранит локально и отправит на сервер (но это лишнее, т.к. данные уже с сервера, но ок)
+        const snapshot = await database.ref('users/' + userId).once('value');
+        const remoteData = snapshot.val();
+        console.log('📥 Получены данные из Firebase:', remoteData);
+        if (remoteData) {
+            appState.profile.name = remoteData.name || '';
+            appState.profile.level = remoteData.level || 1;
+            appState.profile.totalXP = remoteData.totalXP || 0;
+            appState.profile.avatarUrl = remoteData.avatarUrl || null;
+            appState.skills = remoteData.skills || [];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
             renderAll();
-            console.log('✅ Данные загружены с сервера');
+            updateSyncStatus('✅ Синхронизировано');
+            console.log('✅ Данные загружены из Firebase');
             return true;
         } else {
-            console.log('ℹ️ На сервере данных для этого пользователя нет');
+            console.log('ℹ️ В Firebase данных для этого пользователя нет');
+            updateSyncStatus('ℹ️ Данных в облаке нет');
             return false;
         }
     } catch (e) {
-        console.error('❌ Ошибка загрузки с сервера:', e);
+        console.error('❌ Ошибка загрузки из Firebase:', e);
+        updateSyncStatus('❌ Ошибка загрузки');
         return false;
     }
 }
 
 async function saveRemoteData(userId) {
     try {
-        const payload = {
-            userId: userId,
-            data: {
-                name: appState.profile.name,
-                level: appState.profile.level,
-                totalXP: appState.profile.totalXP,
-                avatarUrl: appState.profile.avatarUrl,
-                skills: appState.skills
-            }
+        const dataToSave = {
+            name: appState.profile.name,
+            level: appState.profile.level,
+            totalXP: appState.profile.totalXP,
+            avatarUrl: appState.profile.avatarUrl,
+            skills: appState.skills,
+            lastUpdated: new Date().toISOString()
         };
-        // Используем mode: 'no-cors' для обхода CORS (ответ не прочитаем)
-        await fetch(SHEETS_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        console.log('✅ Данные отправлены в Google Таблицу');
+        await database.ref('users/' + userId).set(dataToSave);
+        console.log('✅ Данные сохранены в Firebase');
+        updateSyncStatus('✅ Сохранено');
     } catch (e) {
-        console.error('❌ Ошибка сохранения на сервер:', e);
+        console.error('❌ Ошибка сохранения в Firebase:', e);
+        updateSyncStatus('❌ Ошибка сохранения');
     }
 }
 
-// ========== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ==========
+// ========== СТАТУС СИНХРОНИЗАЦИИ ==========
+function updateSyncStatus(text) {
+    const el = document.getElementById('sync-text');
+    if (el) el.textContent = text;
+}
+
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
 async function initApp() {
-    // 1. Загружаем локальные данные
+    console.log('🚀 Запуск приложения...');
     loadAppData();
 
-    // 2. Получаем userId
     const userId = getTelegramUserId();
+    console.log('🆔 userId:', userId);
 
-    // 3. Пытаемся загрузить с сервера
     if (userId) {
+        updateSyncStatus('⏳ Загрузка...');
         const hasRemote = await loadRemoteData(userId);
         if (!hasRemote) {
-            // Если на сервере ничего нет, но есть локальные данные с именем – сохраняем их на сервер
             if (appState.profile.name || appState.skills.length > 0) {
-                saveRemoteData(userId);
+                console.log('📤 Локальные данные есть, отправляем в Firebase');
+                await saveRemoteData(userId);
+            } else {
+                console.log('ℹ️ Локальные данные пусты');
+                updateSyncStatus('ℹ️ Нет данных');
             }
         }
     } else {
-        console.warn('Не удалось определить userId, синхронизация недоступна');
+        console.warn('⚠️ Не удалось определить userId');
+        updateSyncStatus('⚠️ Нет ID пользователя');
     }
 
-    // 4. Привязываем события и рендерим (если loadRemoteData уже вызвала renderAll, то повторно не страшно)
     bindEvents();
     renderAll();
 
-    // 5. Отправка профиля при первом запуске (если есть имя и ещё не отправляли)
     if (appState.profile.name && !appState.profile.profileSent) {
         setTimeout(() => sendProfileToAdmin(), 1000);
     }
 }
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (без изменений) ==========
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 function getMaxMastery(skill) { return (skill.masteryDays || 10) * 20; }
 function getMasteryPercent(skill) {
     const max = getMaxMastery(skill);
@@ -171,7 +168,7 @@ function getSkillCategory(skill) {
     return 'hard';
 }
 
-// ========== ОТРИСОВКА (без изменений) ==========
+// ========== ОТРИСОВКА ==========
 function renderProfile() {
     document.getElementById('profile-name').value = appState.profile.name || '';
     updateAvatar();
@@ -272,7 +269,7 @@ function renderTaskSkillList() {
     });
 }
 
-// ========== ЕЖЕДНЕВНЫЙ ТАЙМЕР ==========
+// ========== ТАЙМЕРЫ ==========
 const COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 function resetTimedDailyTasks(skill) {
@@ -305,7 +302,7 @@ function startGlobalTimer() {
     }, 1000);
 }
 
-// ========== РАБОТА С ЗАДАНИЯМИ ==========
+// ========== ЗАДАНИЯ ==========
 function openTasksForSkill(skillId) {
     const skill = appState.skills.find(s => s.id === skillId);
     if (!skill) return;
@@ -403,7 +400,6 @@ function spawnBubbleParticle(bubbleEl) {
 
 // ========== УРОВНИ ==========
 function checkLevelUp() {
-    const prev = appState.profile.level;
     let levelUp = false;
     while (appState.profile.totalXP >= 1000 * appState.profile.level) {
         appState.profile.level++;
@@ -411,7 +407,6 @@ function checkLevelUp() {
     }
     if (levelUp) {
         showLevelUpFlash();
-        // Отправляем обновление админу при повышении уровня
         sendProfileToAdmin();
     }
 }
@@ -422,7 +417,7 @@ function showLevelUpFlash() {
     setTimeout(() => flash.classList.add('hidden'), 1500);
 }
 
-// ========== ЛОПАНИЕ ПУЗЫРЯ ==========
+// ========== ЛОПАНИЕ ==========
 function popSkill(skillId) {
     const skill = appState.skills.find(s => s.id === skillId);
     if (!skill || skill.mastered || getMasteryPercent(skill) < 100) return;
@@ -449,7 +444,6 @@ function popSkill(skillId) {
         skill.mastered = true;
         saveAppData();
         renderAll();
-        // Отправляем обновление админу при освоении навыка
         sendProfileToAdmin();
     }, 600);
 }
@@ -470,7 +464,7 @@ function switchTab(tabName) {
     if (tabName === 'tasks') renderTaskSkillList();
 }
 
-// ========== ЗАГРУЗКА АВАТАРКИ ==========
+// ========== АВАТАР ==========
 function handleAvatarUpload(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -559,19 +553,19 @@ function shareAchievement() {
     });
 }
 
-// ========== ОТПРАВКА ПРОФИЛЯ В TELEGRAM ==========
+// ========== ОТПРАВКА В TELEGRAM ==========
 async function sendProfileToAdmin() {
-    console.log('📤 [sendProfileToAdmin] Вызвана функция');
+    console.log('📤 [sendProfileToAdmin]');
     if (!BOT_TOKEN || !ADMIN_ID) {
-        console.error('❌ [sendProfileToAdmin] Ошибка: BOT_TOKEN или ADMIN_ID не заданы');
+        console.error('❌ Токен или ADMIN_ID не заданы');
         return false;
     }
-
     try {
         const { name, level, totalXP } = appState.profile;
         const masteredSkills = appState.skills.filter(s => s.mastered).map(s => s.name);
         const activeSkills = appState.skills.filter(s => !s.mastered).map(s => `${s.name} (${getMasteryPercent(s).toFixed(0)}%)`);
 
+        // Убрали JSON-блок, чтобы избежать 413
         const message = `👤 *Обновление профиля SkillBloom*
 
 📛 *Имя:* ${name || 'Не указано'}
@@ -584,34 +578,28 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
 
 #skillbloom #обновление`;
 
-        const jsonString = JSON.stringify(appState, null, 2);
-        const jsonBlock = `\n\n\`\`\`json\n${jsonString}\n\`\`\``;
-        const fullMessage = message + jsonBlock;
-
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-        const response = await fetch(url, {
+        const resp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: ADMIN_ID,
-                text: fullMessage,
+                text: message,
                 parse_mode: 'Markdown'
             })
         });
-
-        const result = await response.json();
+        const result = await resp.json();
         if (result.ok) {
-            console.log('✅ [sendProfileToAdmin] Профиль успешно отправлен!');
+            console.log('✅ Отправлено админу');
             appState.profile.lastSent = Date.now();
             appState.profile.profileSent = true;
             saveAppData();
             return true;
         } else {
-            console.error('❌ [sendProfileToAdmin] Ошибка от Telegram:', result.description);
+            console.error('❌ Ошибка Telegram:', result.description);
             return false;
         }
-    } catch (error) {
-        console.error('❌ [sendProfileToAdmin] Исключение:', error);
+    } catch (e) {
+        console.error('❌ Исключение:', e);
         return false;
     }
 }
@@ -676,7 +664,6 @@ function bindEvents() {
         saveAppData();
         renderBubbles();
         document.getElementById('modal-skill').classList.add('hidden');
-        // Отправляем обновление админу при создании навыка (можно убрать, если спамит)
         sendProfileToAdmin();
     });
 
@@ -688,17 +675,22 @@ function bindEvents() {
     document.getElementById('btn-reset').addEventListener('click', resetData);
     document.getElementById('btn-share').addEventListener('click', shareAchievement);
 
-    // Тестовая кнопка отправки (можно оставить)
+    // Кнопка синхронизации
     const actionsDiv = document.querySelector('.actions');
-    if (actionsDiv && !document.getElementById('btn-test-send')) {
-        const testBtn = document.createElement('button');
-        testBtn.id = 'btn-test-send';
-        testBtn.className = 'btn btn-accent';
-        testBtn.textContent = '📤 Тест отправки';
-        testBtn.style.marginTop = '10px';
-        actionsDiv.appendChild(testBtn);
-        testBtn.addEventListener('click', () => {
-            sendProfileToAdmin();
+    if (actionsDiv) {
+        const syncBtn = document.createElement('button');
+        syncBtn.id = 'btn-sync';
+        syncBtn.className = 'btn btn-accent';
+        syncBtn.textContent = '🔄 Синхронизировать';
+        syncBtn.style.gridColumn = 'span 2';
+        actionsDiv.prepend(syncBtn);
+        syncBtn.addEventListener('click', async () => {
+            const userId = getTelegramUserId();
+            if (!userId) { alert('Нет userId'); return; }
+            updateSyncStatus('⏳ Синхронизация...');
+            await loadRemoteData(userId);
+            await saveRemoteData(userId);
+            renderAll();
         });
     }
 
@@ -715,5 +707,4 @@ function renderAll() {
 }
 
 // ========== ЗАПУСК ==========
-// Заменяем старую инициализацию на новую
 initApp();
