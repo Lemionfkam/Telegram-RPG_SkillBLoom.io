@@ -169,9 +169,7 @@ async function initApp() {
     console.log('🚀 Запуск приложения...');
     loadAppData();
 
-    // Ждём, пока Telegram SDK инициализируется
     await new Promise(resolve => setTimeout(resolve, 300));
-
     let userId = getTelegramUserId();
     if (!userId) {
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -266,7 +264,7 @@ function renderBubbles() {
         const pct = getMasteryPercent(skill);
         const ready = pct >= 100;
         return `
-            <div class="bubble-wrapper">
+            <div class="bubble-wrapper" data-skill-id="${skill.id}">
                 <div class="skill-bubble ${ready ? 'ready' : ''}"
                      style="--bubble-size:${size}px; --mastery-pct:${pct};"
                      data-skill-id="${skill.id}">
@@ -277,26 +275,6 @@ function renderBubbles() {
             </div>
         `;
     }).join('');
-
-    container.querySelectorAll('.pop-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const skillId = btn.closest('.bubble-wrapper').querySelector('.skill-bubble').dataset.skillId;
-            popSkill(skillId);
-        });
-    });
-    container.querySelectorAll('.delete-skill-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteSkill(btn.closest('.skill-bubble').dataset.skillId);
-        });
-    });
-    container.querySelectorAll('.skill-bubble').forEach(b => {
-        b.addEventListener('click', () => {
-            openTasksForSkill(b.dataset.skillId);
-            switchTab('tasks');
-        });
-    });
 }
 
 function renderTaskSkillList() {
@@ -313,9 +291,6 @@ function renderTaskSkillList() {
             </div>
         `;
     }).join('');
-    list.querySelectorAll('.task-skill-card').forEach(c => {
-        c.addEventListener('click', () => openTasksForSkill(c.dataset.skillId));
-    });
 }
 
 // ========== ТАЙМЕРЫ ==========
@@ -353,8 +328,16 @@ function startGlobalTimer() {
 
 // ========== ЗАДАНИЯ ==========
 function openTasksForSkill(skillId) {
+    console.log('openTasksForSkill вызван, skillId:', skillId);
+    if (!skillId) {
+        console.warn('Нет skillId');
+        return;
+    }
     const skill = appState.skills.find(s => s.id === skillId);
-    if (!skill) return;
+    if (!skill) {
+        console.error('Навык не найден!');
+        return;
+    }
     resetTimedDailyTasks(skill);
     const max = getMaxMastery(skill);
     document.getElementById('task-skill-title').textContent = skill.name;
@@ -391,12 +374,9 @@ function openTasksForSkill(skillId) {
         `;
     }).join('');
 
-    taskListEl.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(cb => {
-        cb.addEventListener('change', (e) => {
-            const taskId = e.target.closest('.task-item').dataset.taskId;
-            completeTask(skill, taskId);
-        });
-    });
+    // Обработчики для чекбоксов – динамически, но через делегирование на taskList
+    // Убираем старые, повесим один раз на весь список
+    // Но проще использовать делегирование, которое уже есть в bindEvents
 
     document.getElementById('btn-add-task').onclick = () => {
         const text = document.getElementById('new-task-text').value.trim();
@@ -413,7 +393,14 @@ function openTasksForSkill(skillId) {
         renderTaskSkillList();
     };
 
-    document.getElementById('modal-tasks').classList.remove('hidden');
+    // Показываем модалку
+    const modal = document.getElementById('modal-tasks');
+    if (modal) {
+        modal.classList.remove('hidden');
+        console.log('Модалка задач открыта');
+    } else {
+        console.error('modal-tasks не найден');
+    }
     startGlobalTimer();
 }
 
@@ -468,6 +455,7 @@ function showLevelUpFlash() {
 
 // ========== ЛОПАНИЕ ==========
 function popSkill(skillId) {
+    console.log('popSkill вызван, skillId:', skillId);
     const skill = appState.skills.find(s => s.id === skillId);
     if (!skill || skill.mastered || getMasteryPercent(skill) < 100) return;
     const bubble = document.querySelector(`.skill-bubble[data-skill-id="${skillId}"]`);
@@ -498,6 +486,7 @@ function popSkill(skillId) {
 }
 
 function deleteSkill(skillId) {
+    console.log('deleteSkill вызван, skillId:', skillId);
     if (!confirm('Удалить навык? Задания будут потеряны.')) return;
     appState.skills = appState.skills.filter(s => s.id !== skillId);
     saveAppData();
@@ -652,16 +641,19 @@ ${masteredSkills.length > 0 ? `✅ *Освоенные:* ${masteredSkills.join('
     }
 }
 
-// ========== ПРИВЯЗКА СОБЫТИЙ ==========
+// ========== ПРИВЯЗКА СОБЫТИЙ (ДЕЛЕГИРОВАНИЕ НА DOCUMENT) ==========
 function bindEvents() {
+    // Навигация
     document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
+    // Имя
     document.getElementById('profile-name').addEventListener('input', (e) => {
         appState.profile.name = e.target.value;
         updateAvatar();
         saveAppData();
     });
 
+    // Аватар
     document.getElementById('btn-change-avatar').addEventListener('click', () => {
         document.getElementById('avatar-file-input').click();
     });
@@ -672,6 +664,7 @@ function bindEvents() {
         e.target.value = '';
     });
 
+    // Добавить навык
     document.getElementById('btn-add-skill').addEventListener('click', () => {
         document.getElementById('modal-skill').classList.remove('hidden');
         document.getElementById('skill-name-input').value = '';
@@ -715,6 +708,7 @@ function bindEvents() {
         sendProfileToAdmin();
     });
 
+    // Экспорт/импорт/сброс
     document.getElementById('btn-export').addEventListener('click', exportData);
     document.getElementById('btn-import').addEventListener('click', () => document.getElementById('import-file-input').click());
     document.getElementById('import-file-input').addEventListener('change', (e) => {
@@ -745,9 +739,92 @@ function bindEvents() {
         });
     }
 
+    // Закрытие модалок
     document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.add('hidden')));
     document.querySelectorAll('.modal-backdrop').forEach(b => b.addEventListener('click', () => b.parentElement.classList.add('hidden')));
 
+    // ========== ДЕЛЕГИРОВАНИЕ СОБЫТИЙ НА DOCUMENT ==========
+    // Клик по пузырьку (открыть задания)
+    document.addEventListener('click', (e) => {
+        const bubble = e.target.closest('.skill-bubble');
+        if (bubble) {
+            const skillId = bubble.dataset.skillId;
+            if (skillId) {
+                console.log('Клик по пузырьку, id:', skillId);
+                openTasksForSkill(skillId);
+                switchTab('tasks');
+                e.preventDefault();
+            }
+        }
+    });
+
+    // Клик по карточке навыка в списке заданий
+    document.addEventListener('click', (e) => {
+        const card = e.target.closest('.task-skill-card');
+        if (card) {
+            const skillId = card.dataset.skillId;
+            if (skillId) {
+                console.log('Клик по карточке навыка, id:', skillId);
+                openTasksForSkill(skillId);
+                e.preventDefault();
+            }
+        }
+    });
+
+    // Клик по кнопке "Лопнуть"
+    document.addEventListener('click', (e) => {
+        const popBtn = e.target.closest('.pop-btn');
+        if (popBtn) {
+            const wrapper = popBtn.closest('.bubble-wrapper');
+            if (wrapper) {
+                const skillId = wrapper.dataset.skillId;
+                if (skillId) {
+                    console.log('Клик по "Лопнуть", id:', skillId);
+                    popSkill(skillId);
+                    e.preventDefault();
+                }
+            }
+        }
+    });
+
+    // Клик по кнопке удаления навыка
+    document.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.delete-skill-btn');
+        if (delBtn) {
+            const bubble = delBtn.closest('.skill-bubble');
+            if (bubble) {
+                const skillId = bubble.dataset.skillId;
+                if (skillId) {
+                    console.log('Клик по удалению навыка, id:', skillId);
+                    deleteSkill(skillId);
+                    e.preventDefault();
+                }
+            }
+        }
+    });
+
+    // Клик по чекбоксу задания (делегирование)
+    document.addEventListener('change', (e) => {
+        const checkbox = e.target.closest('input[type="checkbox"]');
+        if (checkbox && !checkbox.disabled) {
+            const taskItem = checkbox.closest('.task-item');
+            if (taskItem) {
+                const taskId = taskItem.dataset.taskId;
+                if (taskId) {
+                    // Находим текущий навык (он должен быть открыт в модалке)
+                    const skillTitle = document.getElementById('task-skill-title').textContent;
+                    const skill = appState.skills.find(s => s.name === skillTitle);
+                    if (skill) {
+                        completeTask(skill, taskId);
+                    } else {
+                        console.warn('Не найден навык для выполнения задания');
+                    }
+                }
+            }
+        }
+    });
+
+    // Сброс таймеров при загрузке
     appState.skills.forEach(skill => resetTimedDailyTasks(skill));
 }
 
