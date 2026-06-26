@@ -14,9 +14,10 @@ let appState = {
     skills: []
 };
 
+let isRemoteUpdate = false;
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
-// ========== КОНФИГУРАЦИЯ ДЛЯ TELEGRAM ==========
+// ========== КОНФИГУРАЦИЯ ==========
 const BOT_TOKEN = '8974483180:AAExT6X7S7JeAkyXqPeP8u2qYFZlzG8EUs4';
 const ADMIN_ID = 1099017045;
 const SEND_INTERVAL_MS = 48 * 60 * 60 * 1000;
@@ -39,42 +40,50 @@ function loadAppData() {
 function saveAppData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
     console.log('💾 Локально сохранено');
-    const userId = getTelegramUserId();
-    if (userId) {
-        saveRemoteData(userId);
+    if (!isRemoteUpdate) {
+        const userId = getTelegramUserId();
+        if (userId) {
+            saveRemoteData(userId);
+        } else {
+            console.warn('⚠️ Нет Telegram ID, синхронизация невозможна');
+        }
     }
 }
 
-// ========== РАБОТА С USER ID ==========
+// ========== РАБОТА С USER ID (ТОЛЬКО TELEGRAM) ==========
 function getTelegramUserId() {
     try {
-        if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
-            const user = window.Telegram.WebApp.initDataUnsafe?.user;
+        if (typeof window.Telegram !== 'undefined' && 
+            window.Telegram.WebApp && 
+            window.Telegram.WebApp.initDataUnsafe) {
+            
+            const user = window.Telegram.WebApp.initDataUnsafe.user;
             if (user && user.id) {
                 const id = String(user.id);
                 localStorage.setItem(USER_ID_KEY, id);
+                console.log('✅ Получен Telegram ID:', id);
                 return id;
             }
         }
     } catch (e) {
-        console.warn('Ошибка получения ID из Telegram', e);
+        console.warn('Ошибка получения ID из Telegram:', e);
     }
-    let localId = localStorage.getItem(USER_ID_KEY);
-    if (!localId) {
-        localId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-        localStorage.setItem(USER_ID_KEY, localId);
-        console.log('🆕 Сгенерирован локальный userId:', localId);
-    }
-    return localId;
+    console.warn('❌ Telegram WebApp не доступен или user.id отсутствует');
+    return null;
 }
 
 // ========== СИНХРОНИЗАЦИЯ С FIREBASE ==========
 async function loadRemoteData(userId) {
+    if (!userId) {
+        console.warn('⚠️ loadRemoteData: userId не указан');
+        return false;
+    }
     try {
         const snapshot = await database.ref('users/' + userId).once('value');
         const remoteData = snapshot.val();
         console.log('📥 Получены данные из Firebase:', remoteData);
         if (remoteData) {
+            isRemoteUpdate = true;
             appState.profile.name = remoteData.name || '';
             appState.profile.level = remoteData.level || 1;
             appState.profile.totalXP = remoteData.totalXP || 0;
@@ -84,6 +93,7 @@ async function loadRemoteData(userId) {
             renderAll();
             updateSyncStatus('✅ Синхронизировано');
             console.log('✅ Данные загружены из Firebase');
+            isRemoteUpdate = false;
             return true;
         } else {
             console.log('ℹ️ В Firebase данных для этого пользователя нет');
@@ -98,6 +108,11 @@ async function loadRemoteData(userId) {
 }
 
 async function saveRemoteData(userId) {
+    if (!userId) {
+        console.warn('⚠️ saveRemoteData: userId не указан');
+        return;
+    }
+    if (isRemoteUpdate) return;
     try {
         const dataToSave = {
             name: appState.profile.name,
@@ -116,6 +131,43 @@ async function saveRemoteData(userId) {
     }
 }
 
+function subscribeToRemoteUpdates(userId) {
+    if (!userId) return;
+    const userRef = database.ref('users/' + userId);
+    userRef.on('value', (snapshot) => {
+        const remoteData = snapshot.val();
+        if (remoteData) {
+            console.log('🔄 Обнаружены изменения в Firebase');
+            isRemoteUpdate = true;
+            const newData = {
+                name: remoteData.name || '',
+                level: remoteData.level || 1,
+                totalXP: remoteData.totalXP || 0,
+                avatarUrl: remoteData.avatarUrl || null,
+                skills: remoteData.skills || []
+            };
+            const currentData = {
+                name: appState.profile.name,
+                level: appState.profile.level,
+                totalXP: appState.profile.totalXP,
+                avatarUrl: appState.profile.avatarUrl,
+                skills: appState.skills
+            };
+            if (JSON.stringify(currentData) !== JSON.stringify(newData)) {
+                appState.profile.name = newData.name;
+                appState.profile.level = newData.level;
+                appState.profile.totalXP = newData.totalXP;
+                appState.profile.avatarUrl = newData.avatarUrl;
+                appState.skills = newData.skills;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+                renderAll();
+                updateSyncStatus('✅ Обновлено с сервера');
+            }
+            isRemoteUpdate = false;
+        }
+    });
+}
+
 // ========== СТАТУС СИНХРОНИЗАЦИИ ==========
 function updateSyncStatus(text) {
     const el = document.getElementById('sync-text');
@@ -130,22 +182,32 @@ async function initApp() {
     const userId = getTelegramUserId();
     console.log('🆔 userId:', userId);
 
-    if (userId) {
-        updateSyncStatus('⏳ Загрузка...');
-        const hasRemote = await loadRemoteData(userId);
-        if (!hasRemote) {
-            if (appState.profile.name || appState.skills.length > 0) {
-                console.log('📤 Локальные данные есть, отправляем в Firebase');
-                await saveRemoteData(userId);
-            } else {
-                console.log('ℹ️ Локальные данные пусты');
-                updateSyncStatus('ℹ️ Нет данных');
-            }
-        }
-    } else {
-        console.warn('⚠️ Не удалось определить userId');
-        updateSyncStatus('⚠️ Нет ID пользователя');
+    if (!userId) {
+        // Показываем сообщение, что приложение работает только через Telegram
+        document.getElementById('main-content').innerHTML = `
+            <div style="text-align:center; padding:40px 20px; color:var(--text-secondary);">
+                <h2 style="color:#fff;">⛔ Требуется Telegram</h2>
+                <p style="margin:20px 0;">Пожалуйста, откройте это приложение через Telegram WebApp.</p>
+                <p style="font-size:0.9rem;">Нажмите на кнопку в боте, чтобы запустить.</p>
+            </div>
+        `;
+        updateSyncStatus('❌ Требуется Telegram');
+        return;
     }
+
+    updateSyncStatus('⏳ Загрузка...');
+    const hasRemote = await loadRemoteData(userId);
+    if (!hasRemote) {
+        if (appState.profile.name || appState.skills.length > 0) {
+            console.log('📤 Локальные данные есть, отправляем в Firebase');
+            await saveRemoteData(userId);
+        } else {
+            console.log('ℹ️ Локальные данные пусты');
+            updateSyncStatus('ℹ️ Нет данных');
+        }
+    }
+    // Подписка на изменения в реальном времени
+    subscribeToRemoteUpdates(userId);
 
     bindEvents();
     renderAll();
@@ -155,7 +217,7 @@ async function initApp() {
     }
 }
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (без изменений) ==========
 function getMaxMastery(skill) { return (skill.masteryDays || 10) * 20; }
 function getMasteryPercent(skill) {
     const max = getMaxMastery(skill);
@@ -565,7 +627,6 @@ async function sendProfileToAdmin() {
         const masteredSkills = appState.skills.filter(s => s.mastered).map(s => s.name);
         const activeSkills = appState.skills.filter(s => !s.mastered).map(s => `${s.name} (${getMasteryPercent(s).toFixed(0)}%)`);
 
-        // Убрали JSON-блок, чтобы избежать 413
         const message = `👤 *Обновление профиля SkillBloom*
 
 📛 *Имя:* ${name || 'Не указано'}
@@ -686,7 +747,10 @@ function bindEvents() {
         actionsDiv.prepend(syncBtn);
         syncBtn.addEventListener('click', async () => {
             const userId = getTelegramUserId();
-            if (!userId) { alert('Нет userId'); return; }
+            if (!userId) {
+                alert('❌ Telegram ID не найден. Откройте приложение через бота.');
+                return;
+            }
             updateSyncStatus('⏳ Синхронизация...');
             await loadRemoteData(userId);
             await saveRemoteData(userId);
