@@ -83,7 +83,11 @@ async function loadRemoteData(userId) {
             appState.profile.level = remoteData.level || 1;
             appState.profile.totalXP = remoteData.totalXP || 0;
             appState.profile.avatarUrl = remoteData.avatarUrl || null;
-            appState.skills = remoteData.skills || [];
+            // Убедимся, что у каждого навыка есть поле tasks
+            appState.skills = (remoteData.skills || []).map(skill => {
+                if (!skill.tasks) skill.tasks = [];
+                return skill;
+            });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
             renderAll();
             updateSyncStatus('✅ Синхронизировано');
@@ -134,7 +138,10 @@ function subscribeToRemoteUpdates(userId) {
                 level: remoteData.level || 1,
                 totalXP: remoteData.totalXP || 0,
                 avatarUrl: remoteData.avatarUrl || null,
-                skills: remoteData.skills || []
+                skills: (remoteData.skills || []).map(skill => {
+                    if (!skill.tasks) skill.tasks = [];
+                    return skill;
+                })
             };
             const currentData = {
                 name: appState.profile.name,
@@ -297,6 +304,7 @@ function renderTaskSkillList() {
 const COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 function resetTimedDailyTasks(skill) {
+    if (!skill.tasks) skill.tasks = [];
     const now = Date.now();
     skill.tasks.forEach(t => {
         if (t.type === 'daily' && t.done && t.doneTimestamp && (now - t.doneTimestamp >= COOLDOWN_MS)) {
@@ -334,12 +342,13 @@ function openTasksForSkill(skillId) {
             alert('нет skillId');
             return;
         }
-        // Поиск навыка с приведением типов
         const skill = appState.skills.find(s => String(s.id) === String(skillId));
         if (!skill) {
             alert('навык не найден! Ищем id: ' + skillId + ', но в skills есть только: ' + appState.skills.map(s => s.id).join(', '));
             return;
         }
+        // Гарантируем наличие поля tasks
+        if (!skill.tasks) skill.tasks = [];
         console.log('Навык найден:', skill.name);
         resetTimedDailyTasks(skill);
         const max = getMaxMastery(skill);
